@@ -229,16 +229,28 @@ func AnalyzeHandler(decon *engine.Deconstructor) http.HandlerFunc {
 			log.Println("search warning:", err) 
 		}
 
-		// Apply relevance filter if intent is available
+		// Apply relevance filter using domain matching
 		var filtered []search.SearchResult
-		if query.Intent != "" {
+		if query.PrimaryDomain != "" {
 			for _, r := range results {
-				if decon.IsRelevant(ctx, query.Intent, r.Snippet) {
+				if decon.IsRelevant(ctx, query.PrimaryDomain, query.TechnicalLayer, query.CoreProblem, r.Snippet) {
 					filtered = append(filtered, r)
 				}
 			}
 		} else {
 			filtered = results
+		}
+
+		// FALLBACK: If filter removed everything but we had results, return top unfiltered results
+		// This prevents "No Prior Art Found" when filter is overly aggressive
+		if len(filtered) == 0 && len(results) > 0 {
+			log.Printf("Filter removed all %d results, falling back to top 5 unfiltered", len(results))
+			// Return top 5 unfiltered results as fallback
+			if len(results) > 5 {
+				filtered = results[:5]
+			} else {
+				filtered = results
+			}
 		}
 
 		if filtered == nil {

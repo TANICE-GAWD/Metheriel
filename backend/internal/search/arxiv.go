@@ -40,6 +40,13 @@ func (a *ArxivProvider) Name() string {
 func buildArxivQuery(keywords []string) string {
 	var parts []string
 
+	// OPTIMIZATION: Use only top 3-5 keywords to avoid timeout
+	// Too many AND conditions makes query fail
+	maxKeywords := 4
+	if len(keywords) > maxKeywords {
+		keywords = keywords[:maxKeywords]
+	}
+
 	for _, kw := range keywords {
 		kw = strings.TrimSpace(kw)
 		if kw == "" {
@@ -49,8 +56,16 @@ func buildArxivQuery(keywords []string) string {
 		parts = append(parts, fmt.Sprintf("all:%s", url.QueryEscape(kw)))
 	}
 
-	
-	return strings.Join(parts, "+AND+")
+	// Use AND for first 2 keywords (core concepts)
+	// Then use OR for the rest (broader matching)
+	if len(parts) <= 2 {
+		return strings.Join(parts, "+AND+")
+	}
+
+	// First 2 with AND, rest with OR for broader search
+	corePart := strings.Join(parts[:2], "+AND+")
+	restPart := strings.Join(parts[2:], "+OR+")
+	return corePart + "+AND+(" + restPart + ")"
 }
 
 

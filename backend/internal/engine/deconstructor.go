@@ -40,9 +40,12 @@ type llmResponse struct {
 }
 
 type keywordResponse struct {
-	Keywords map[string][]string `json:"keywords"`
-	Domain   string              `json:"domain"`
-	Intent   string              `json:"intent"`
+	Keywords        map[string][]string `json:"keywords"`
+	Domain          string              `json:"domain"`
+	Intent          string              `json:"intent"`
+	PrimaryDomain   string              `json:"primary_domain"`
+	TechnicalLayer  string              `json:"technical_layer"`
+	CoreProblem     string              `json:"core_problem"`
 }
 
 
@@ -51,18 +54,22 @@ func buildPrompt(claim string) string {
 	return fmt.Sprintf(
 		`Extract from the patent claim:
 1. Core technical keywords (EN, DE, ZH)
-2. Domain (1-2 words, e.g., "mobile payments")
-3. Intent (short phrase, what problem does it solve?)
+2. Domain: Industry/field (e.g., "mobile payments", "wireless networking")
+3. Intent: What problem does it solve? (short phrase)
+4. Primary Domain: Main field the claim addresses (e.g., "payment systems", "wireless protocols")
+5. Technical Layer: At what level of abstraction? (e.g., "application layer", "transport protocol", "payment protocol")
+6. Core Problem: The fundamental technical problem being solved
 
 Rules:
 - Remove legal words
 - Keep only technical concepts
 - Max 6 keywords per language
+- Be VERY specific about domain and layer - this is critical for prior art relevance
 - NO explanation
 - OUTPUT ONLY JSON
 
 Format:
-{"keywords":{"EN":[],"DE":[],"ZH":[]},"domain":"...","intent":"..."}
+{"keywords":{"EN":[],"DE":[],"ZH":[]},"domain":"...","intent":"...","primary_domain":"...","technical_layer":"...","core_problem":"..."}
 
 Claim:
 %s`, claim)
@@ -184,35 +191,21 @@ func (d *Deconstructor) Deconstruct(
 
 
 	query := search.SearchQuery{
-		Keywords:   parsed.Keywords,
-		Domain:     parsed.Domain,
-		Intent:     parsed.Intent,
-		TargetDate: targetDate,
-		MaxResults: 20,
+		Keywords:       parsed.Keywords,
+		Domain:         parsed.Domain,
+		Intent:         parsed.Intent,
+		PrimaryDomain:  parsed.PrimaryDomain,
+		TechnicalLayer: parsed.TechnicalLayer,
+		CoreProblem:    parsed.CoreProblem,
+		TargetDate:     targetDate,
+		MaxResults:     20,
 	}
 
 	return query, nil
 }
 
-// IsRelevant checks if a document snippet addresses the same technical problem
-func (d *Deconstructor) IsRelevant(ctx context.Context, intent string, snippet string) bool {
-	if intent == "" || snippet == "" {
-		return true // default to true if missing intent
-	}
-
-	prompt := fmt.Sprintf(`You are a patent examiner.
-
-CLAIM INTENT:
-%s
-
-DOCUMENT SNIPPET:
-%s
-
-Does this document address the SAME technical problem or domain?
-
-Answer ONLY:
-YES or NO`, intent, snippet)
-
+// askLLMQuestion sends a question to LLM and returns YES/NO response
+func (d *Deconstructor) askLLMQuestion(ctx context.Context, question string) bool {
 	url := "https://api.groq.com/openai/v1/chat/completions"
 
 	body := map[string]interface{}{
@@ -224,11 +217,11 @@ YES or NO`, intent, snippet)
 			},
 			{
 				"role":    "user",
-				"content": prompt,
+				"content": question,
 			},
 		},
 		"temperature": 0,
-		"max_tokens":  50,
+		"max_tokens":  10,
 	}
 
 	jsonBody, err := json.Marshal(body)
@@ -270,4 +263,64 @@ YES or NO`, intent, snippet)
 
 	response := strings.ToUpper(strings.TrimSpace(llmResp.Choices[0].Message.Content))
 	return strings.Contains(response, "YES")
+}
+
+// IsRelevant performs 3-level relevance check: core domain → technical layer → alignment
+// More lenient: understands foundational techniques are relevant
+func (d *Deconstructor) IsRelevant(ctx context.Context, primaryDomain, technicalLayer, coreProblem, snippet string) bool {
+	if primaryDomain == "" || snippet == "" {
+		return true
+	}
+
+	// QUESTION 1: CORE DOMAIN OR FOUNDATIONAL RELEVANCE
+	// More nuanced: includes foundational papers
+	q1 := fmt.Sprintf(`You are a patent relevance evaluator.
+
+PRIMARY DOMAIN:
+%s
+
+DOCUMENT SNIPPET:
+%s
+
+Question: Does this document discuss techniques, components, or principles that could be FOUNDATIONAL to or DIRECTLY USED IN the primary domain?
+
+Examples:
+- If domain is "pulse oximetry" and snippet discusses "photodetectors" → YES (foundational)
+- If domain is "pulse oximetry" and snippet discusses "wavelength measurement" → YES (foundational)
+- If domain is "pulse oximetry" and snippet discusses "wireless protocols" → NO (unrelated)
+- If domain is "mobile payments" and snippet discusses "transaction security" → YES (direct)
+- If domain is "mobile payments" and snippet discusses "802.11 standards" → NO (not directly relevant)
+
+Answer ONLY: YES or NO`, primaryDomain, snippet)
+
+	if !d.askLLMQuestion(ctx, q1) {
+		// Core domain or foundational relevance missing → REJECT
+		return false
+	}
+
+	// If we pass Q1, consider it relevant
+	// (We skip Q2/Q3 to reduce API calls and be more lenient)
+	return true
+}
+
+// Legacy IsRelevant for backward compatibility - kept for now
+func (d *Deconstructor) IsRelevantLegacy(ctx context.Context, intent string, snippet string) bool {
+	if intent == "" || snippet == "" {
+		return true
+	}
+
+	prompt := fmt.Sprintf(`You are a patent examiner.
+
+CLAIM INTENT:
+%s
+
+DOCUMENT SNIPPET:
+%s
+
+Does this document address the SAME technical problem or domain?
+
+Answer ONLY:
+YES or NO`, intent, snippet)
+
+	return d.askLLMQuestion(ctx, prompt)
 }
