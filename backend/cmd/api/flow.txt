@@ -1,0 +1,11 @@
+Final Project Flow >>
+
+1. User pastes a claim into SearchBar.
+
+2. App.jsx calls api.js.
+
+3. Go Backend deconstructs it and searches ArXiv.
+
+4. App.jsx renders a list of ResultCard components.
+
+5. User clicks a ResultCard, which expands to show the ConflictView.
