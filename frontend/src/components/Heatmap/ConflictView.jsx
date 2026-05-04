@@ -2,62 +2,60 @@ import { useState } from "react";
 import "../../assets/global.css";
 import "./ConflictView.css";
 
-
-
 export default function ConflictView({
   claimText,
   priorArtText,
   conflicts = [],
   confidence = 0.78,
 }) {
-  const [hoveredId, setHoveredId] = useState(null);
+  const [hoveredIndex, setHoveredIndex] = useState(null);
 
-  
-  
-  
-
-  const highlightText = (text, side) => {
-    if (!conflicts.length) return text;
+  function highlightText(text, conflicts, side) {
+    if (!text) return text;
+    if (!conflicts || !Array.isArray(conflicts) || conflicts.length === 0) {
+      return text;
+    }
 
     let parts = [text];
 
-    conflicts.forEach((conflict) => {
-      const regex = new RegExp(`(${conflict.keyword})`, "gi");
+    conflicts.forEach((conflict, index) => {
+      if (!conflict) return;
 
-      parts = parts.flatMap((part) => {
+      const target = side === "left" ? conflict.claim : conflict.prior;
+
+      if (!target) return;
+
+      parts = parts.flatMap(part => {
         if (typeof part !== "string") return [part];
 
-        return part.split(regex).map((chunk, i) => {
-          if (regex.test(chunk)) {
-            return {
-              text: chunk,
-              id: conflict.id,
-            };
+        const split = part.split(target);
+
+        if (split.length === 1) return [part];
+
+        const result = [];
+        split.forEach((s, i) => {
+          result.push(s);
+
+          if (i < split.length - 1) {
+            result.push(
+              <span
+                key={`${index}-${i}`}
+                className={`highlight-text ${hoveredIndex === index ? "active" : ""}`}
+                onMouseEnter={() => setHoveredIndex(index)}
+                onMouseLeave={() => setHoveredIndex(null)}
+              >
+                {target}
+              </span>
+            );
           }
-          return chunk;
         });
+
+        return result;
       });
     });
 
-    return parts.map((part, i) => {
-      if (typeof part === "string") {
-        return <span key={i}>{part}</span>;
-      }
-
-      return (
-        <span
-          key={i}
-          className={`highlight-text ${
-            hoveredId === part.id ? "active" : ""
-          }`}
-          onMouseEnter={() => setHoveredId(part.id)}
-          onMouseLeave={() => setHoveredId(null)}
-        >
-          {part.text}
-        </span>
-      );
-    });
-  };
+    return parts;
+  }
 
   
   
@@ -65,20 +63,17 @@ export default function ConflictView({
 
   return (
     <div className="conflict-wrapper">
-
-      {/* PROOF BANNER */}
+      {/* OVERLAP BANNER */}
       <div className="conflict-banner">
-        <strong>Overlap Confidence:</strong>{" "}
-        {(confidence * 100).toFixed(1)}%
+        Overlap Score: {Math.round(confidence * 100)}%
       </div>
 
       <div className="conflict-container">
-
         {/* LEFT: CLAIM */}
         <div className="conflict-pane">
           <h3>Patent Claim</h3>
           <div className="conflict-text">
-            {highlightText(claimText, "left")}
+            {highlightText(claimText, conflicts, "left")}
           </div>
         </div>
 
@@ -86,10 +81,9 @@ export default function ConflictView({
         <div className="conflict-pane">
           <h3>Prior Art</h3>
           <div className="conflict-text">
-            {highlightText(priorArtText, "right")}
+            {highlightText(priorArtText, conflicts, "right")}
           </div>
         </div>
-
       </div>
     </div>
   );

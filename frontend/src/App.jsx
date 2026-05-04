@@ -1,5 +1,6 @@
 import { useState, useRef } from "react";
 import { analyzePatent } from "./services/api";
+import ResultCard from "./components/Results/ResultCard";
 import "./assets/global.css";
 import "./App.css";
 
@@ -133,22 +134,14 @@ export default function App() {
             </div>
 
             {/* RESULTS */}
-            <div className="card">
-              <h3>Prior Art Results</h3>
-
+            <div style={{ gridColumn: "1 / -1" }}>
+              <h3 style={{ marginBottom: "1rem" }}>Prior Art Results</h3>
               {data.results.map((r, i) => (
-                <div key={i} className="result-item">
-                  <a href={r.url} target="_blank" rel="noreferrer">
-                    {r.title}
-                  </a>
-                  <p className="text-muted">{r.snippet}</p>
-                  <div className="result-meta">
-                    <span>{r.source}</span>
-                    <span>
-                      {new Date(r.date).toLocaleDateString()}
-                    </span>
-                  </div>
-                </div>
+                <ResultCard
+                  key={i}
+                  result={r}
+                  claimText={query}
+                />
               ))}
             </div>
           </div>

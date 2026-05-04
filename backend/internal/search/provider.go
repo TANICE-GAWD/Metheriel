@@ -39,6 +39,8 @@ type SearchResult struct {
 
 type SearchQuery struct {
 	Keywords   map[string][]string `json:"keywords"` 
+	Domain     string              `json:"domain"`
+	Intent     string              `json:"intent"`
 	TargetDate time.Time           `json:"target_date"`
 	MaxResults int                 `json:"max_results"`
 }

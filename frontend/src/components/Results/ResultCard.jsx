@@ -21,7 +21,6 @@ export default function ResultCard({ result, claimText }) {
 
     setIsExpanded(true);
 
-    
     if (analysis) return;
 
     setLoading(true);
@@ -29,7 +28,7 @@ export default function ResultCard({ result, claimText }) {
 
     try {
       const data = await getDetailedAnalysis({
-        patentText: claimText,
+        claimText,
         priorArtText: result.snippet,
       });
 
@@ -97,6 +96,16 @@ export default function ResultCard({ result, claimText }) {
         <div className="error-text">
           {error}
         </div>
+      )}
+
+      {/* CONFLICT VIEW */}
+      {isExpanded && analysis && (
+        <ConflictView
+          claimText={claimText}
+          priorArtText={result.snippet}
+          conflicts={analysis.conflicts}
+          confidence={analysis.confidence}
+        />
       )}
 
       {/* EXPANDED VIEW */}

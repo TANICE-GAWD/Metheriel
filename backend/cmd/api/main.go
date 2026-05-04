@@ -106,6 +106,10 @@ func DetailedAnalysisHandler(decon *engine.Deconstructor) http.HandlerFunc {
 		priorPhrases := extractPhrases(req.PriorText)
 
 		conflicts := findConflicts(claimPhrases, priorPhrases)
+		if conflicts == nil {
+			conflicts = []Conflict{}
+		}
+
 		confidence := calculateConfidence(conflicts, len(claimPhrases))
 
 		resp := DetailedAnalysisResponse{
@@ -225,13 +229,29 @@ func AnalyzeHandler(decon *engine.Deconstructor) http.HandlerFunc {
 			log.Println("search warning:", err) 
 		}
 
+		// Apply relevance filter if intent is available
+		var filtered []search.SearchResult
+		if query.Intent != "" {
+			for _, r := range results {
+				if decon.IsRelevant(ctx, query.Intent, r.Snippet) {
+					filtered = append(filtered, r)
+				}
+			}
+		} else {
+			filtered = results
+		}
+
+		if filtered == nil {
+			filtered = []search.SearchResult{}
+		}
+
 		
 		
 		
 
 		resp := AnalyzeResponse{
 			Keywords: query.Keywords,
-			Results:  results,
+			Results:  filtered,
 		}
 
 		w.Header().Set("Content-Type", "application/json")

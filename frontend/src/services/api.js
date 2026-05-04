@@ -117,7 +117,7 @@ export async function analyzePatent({ claimText, targetDate }) {
 
 
 export async function getDetailedAnalysis({
-  patentText,
+  claimText,
   priorArtText,
 }) {
   try {
@@ -129,14 +129,15 @@ export async function getDetailedAnalysis({
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          patent_text: patentText,
-          prior_art_text: priorArtText,
+          claim_text: claimText,
+          prior_text: priorArtText,
         }),
       }
     );
 
     if (!response.ok) {
-      throw new Error("Failed to generate detailed analysis.");
+      const err = await response.text();
+      throw new Error(err || "Failed to fetch detailed analysis");
     }
 
     return await response.json();

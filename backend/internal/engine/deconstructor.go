@@ -41,24 +41,28 @@ type llmResponse struct {
 
 type keywordResponse struct {
 	Keywords map[string][]string `json:"keywords"`
+	Domain   string              `json:"domain"`
+	Intent   string              `json:"intent"`
 }
 
 
 
 func buildPrompt(claim string) string {
 	return fmt.Sprintf(
-		`Extract core technical keywords from the patent claim.
+		`Extract from the patent claim:
+1. Core technical keywords (EN, DE, ZH)
+2. Domain (1-2 words, e.g., "mobile payments")
+3. Intent (short phrase, what problem does it solve?)
 
 Rules:
 - Remove legal words
 - Keep only technical concepts
-- Generate in EN, DE, ZH
 - Max 6 keywords per language
 - NO explanation
 - OUTPUT ONLY JSON
 
 Format:
-{"keywords":{"EN":[],"DE":[],"ZH":[]}}
+{"keywords":{"EN":[],"DE":[],"ZH":[]},"domain":"...","intent":"..."}
 
 Claim:
 %s`, claim)
@@ -181,9 +185,89 @@ func (d *Deconstructor) Deconstruct(
 
 	query := search.SearchQuery{
 		Keywords:   parsed.Keywords,
+		Domain:     parsed.Domain,
+		Intent:     parsed.Intent,
 		TargetDate: targetDate,
 		MaxResults: 20,
 	}
 
 	return query, nil
+}
+
+// IsRelevant checks if a document snippet addresses the same technical problem
+func (d *Deconstructor) IsRelevant(ctx context.Context, intent string, snippet string) bool {
+	if intent == "" || snippet == "" {
+		return true // default to true if missing intent
+	}
+
+	prompt := fmt.Sprintf(`You are a patent examiner.
+
+CLAIM INTENT:
+%s
+
+DOCUMENT SNIPPET:
+%s
+
+Does this document address the SAME technical problem or domain?
+
+Answer ONLY:
+YES or NO`, intent, snippet)
+
+	url := "https://api.groq.com/openai/v1/chat/completions"
+
+	body := map[string]interface{}{
+		"model": "llama-3.1-8b-instant",
+		"messages": []map[string]string{
+			{
+				"role":    "system",
+				"content": "You are a strict YES/NO classifier. Answer only YES or NO.",
+			},
+			{
+				"role":    "user",
+				"content": prompt,
+			},
+		},
+		"temperature": 0,
+		"max_tokens":  50,
+	}
+
+	jsonBody, err := json.Marshal(body)
+	if err != nil {
+		return false
+	}
+
+	req, err := http.NewRequestWithContext(ctx, "POST", url, bytes.NewBuffer(jsonBody))
+	if err != nil {
+		return false
+	}
+
+	req.Header.Set("Authorization", "Bearer "+d.apiKey)
+	req.Header.Set("Content-Type", "application/json")
+
+	client := &http.Client{
+		Timeout: 8 * time.Second,
+	}
+
+	resp, err := client.Do(req)
+	if err != nil {
+		return false
+	}
+	defer resp.Body.Close()
+
+	respBody, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return false
+	}
+
+	var llmResp llmResponse
+	if err := json.Unmarshal(respBody, &llmResp); err != nil {
+		return false
+	}
+
+	if len(llmResp.Choices) == 0 {
+		return false
+	}
+
+	response := strings.ToUpper(strings.TrimSpace(llmResp.Choices[0].Message.Content))
+	return strings.Contains(response, "YES")
 }
