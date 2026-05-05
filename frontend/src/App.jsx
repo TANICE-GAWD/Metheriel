@@ -1,25 +1,27 @@
 import { useState, useRef } from "react";
-import { analyzePatent } from "./services/api";
+import { analyzePatent, analyzePatentById } from "./services/api";
 import ResultCard from "./components/Results/ResultCard";
 import "./assets/global.css";
 import "./App.css";
 import { Analytics } from "@vercel/analytics/react"
 
 export default function App() {
-  
-  
-  
-
+  const [mode, setMode] = useState("id"); // "id" | "claim"
   const [query, setQuery] = useState("");
+  const [claimText, setClaimText] = useState(""); // actual claim text, resolved after scrape
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
   const resultsRef = useRef(null);
 
-  
-  
-  
+  const handleModeSwitch = (next) => {
+    setMode(next);
+    setQuery("");
+    setClaimText("");
+    setData(null);
+    setError("");
+  };
 
   const handleSearch = async (e) => {
     e.preventDefault();
@@ -29,19 +31,21 @@ export default function App() {
     setLoading(true);
     setError("");
     setData(null);
+    setClaimText("");
 
     try {
-      const response = await analyzePatent({
-        claimText: query,
-      });
+      const response =
+        mode === "id"
+          ? await analyzePatentById({ patentId: query })
+          : await analyzePatent({ claimText: query });
 
+      // For patent-ID mode, the backend returns the scraped claim text.
+      // For paste mode, the user's own input is the claim text.
+      setClaimText(response.claim_text || query);
       setData(response);
 
-      
       setTimeout(() => {
-        resultsRef.current?.scrollIntoView({
-          behavior: "smooth",
-        });
+        resultsRef.current?.scrollIntoView({ behavior: "smooth" });
       }, 100);
     } catch (err) {
       setError(err.message);
@@ -49,10 +53,6 @@ export default function App() {
       setLoading(false);
     }
   };
-
-  
-  
-  
 
   return (
     <div className="app-container">
@@ -66,14 +66,49 @@ export default function App() {
 
       {/* SEARCH */}
       <section className="search-section card">
+        {/* Mode toggle */}
+        <div className="mode-toggle">
+          <button
+            type="button"
+            className={`mode-btn${mode === "id" ? " mode-btn--active" : ""}`}
+            onClick={() => handleModeSwitch("id")}
+          >
+            Patent ID
+          </button>
+          <button
+            type="button"
+            className={`mode-btn${mode === "claim" ? " mode-btn--active" : ""}`}
+            onClick={() => handleModeSwitch("claim")}
+          >
+            Paste Claim
+          </button>
+        </div>
+
         <form onSubmit={handleSearch} className="flex-column">
-          <textarea
-            placeholder="Paste patent claim here..."
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            rows={6}
-            className="search-input"
-          />
+          {mode === "id" ? (
+            <>
+              <input
+                type="text"
+                placeholder="e.g. US7123456B2 or paste a patents.google.com URL"
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                className="search-input"
+                spellCheck={false}
+              />
+              <p className="input-hint">
+                Include the kind code — e.g. <strong>US7123456B2</strong>, not US7123456.
+                Find it at the top of any Google Patents page.
+              </p>
+            </>
+          ) : (
+            <textarea
+              placeholder="Paste patent claim here..."
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              rows={6}
+              className="search-input"
+            />
+          )}
 
           <button
             className="button-primary"
@@ -141,7 +176,7 @@ export default function App() {
                 <ResultCard
                   key={i}
                   result={r}
-                  claimText={query}
+                  claimText={claimText}
                 />
               ))}
             </div>

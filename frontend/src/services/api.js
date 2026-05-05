@@ -3,7 +3,7 @@
 
 
 const API_BASE_URL =
-  import.meta.env.VITE_API_URL || "https://metheriel-production.up.railway.app";
+  import.meta.env.VITE_API_URL || "http://localhost:8080";
 
 const DEFAULT_TIMEOUT = 25000; 
 
@@ -35,6 +35,55 @@ async function fetchWithTimeout(url, options = {}, timeout = DEFAULT_TIMEOUT) {
 
 
 
+
+export async function analyzePatentById({ patentId, targetDate }) {
+  if (!patentId || !patentId.trim()) {
+    throw new Error("Patent ID cannot be empty.");
+  }
+
+  let response;
+
+  try {
+    response = await fetchWithTimeout(`${API_BASE_URL}/v1/analyze-by-patent`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        patent_id: patentId.trim(),
+        target_date: targetDate || "",
+      }),
+    });
+  } catch (err) {
+    throw err;
+  }
+
+  if (!response.ok) {
+    let message = "Something went wrong during analysis.";
+    try {
+      const errorData = await response.json();
+      const detail = errorData.detail || "";
+      if (response.status === 400 || response.status === 422) {
+        message = detail || "Invalid patent ID or format.";
+      } else if (response.status === 502) {
+        if (detail.includes("404")) {
+          message = `Patent not found on Google Patents. Check the ID and try again (e.g. US7123456B2).`;
+        } else {
+          message = detail || "Could not fetch the patent from Google Patents.";
+        }
+      } else if (response.status === 500) {
+        message = "Server error. Try again in a moment.";
+      }
+      console.error("Backend error:", errorData);
+    } catch {}
+    throw new Error(message);
+  }
+
+  const data = await response.json();
+  return {
+    keywords: data.keywords || {},
+    results: data.results || [],
+    status: data.results?.length ? "success" : "no_results",
+  };
+}
 
 export async function analyzePatent({ claimText, targetDate }) {
   if (!claimText || claimText.trim().length === 0) {

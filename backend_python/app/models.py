@@ -1,0 +1,43 @@
+"""Request and response models for the public HTTP API."""
+
+from __future__ import annotations
+
+from typing import Dict, List, Optional
+
+from pydantic import BaseModel, ConfigDict
+
+from app.search.base import SearchResult
+
+
+class AnalyzeRequest(BaseModel):
+    claim_text: str
+    target_date: Optional[str] = None
+
+
+class AnalyzeByPatentRequest(BaseModel):
+    patent_id: str
+    target_date: Optional[str] = None
+
+
+class AnalyzeResponse(BaseModel):
+    keywords: Dict[str, List[str]]
+    results: List[SearchResult]
+    claim_text: Optional[str] = None
+
+
+class DetailedAnalysisRequest(BaseModel):
+    claim_text: str
+    prior_text: str
+
+
+class Conflict(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+
+    claim: str
+    prior: str
+    similarity: float
+
+
+class DetailedAnalysisResponse(BaseModel):
+    conflicts: List[Conflict]
+    confidence: float
