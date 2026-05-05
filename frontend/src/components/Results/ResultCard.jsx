@@ -139,15 +139,6 @@ export default function ResultCard({ result, claimText }) {
         />
       )}
 
-      {/* EXPANDED VIEW */}
-      {isExpanded && analysis && (
-        <ConflictView
-          claimText={claimText}
-          priorArtText={result.snippet}
-          conflicts={analysis.conflicts}
-          confidence={analysis.confidence}
-        />
-      )}
     </div>
   );
 }

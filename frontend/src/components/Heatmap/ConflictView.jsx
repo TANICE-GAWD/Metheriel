@@ -1,6 +1,18 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import "../../assets/global.css";
 import "./ConflictView.css";
+
+const STOP_WORDS = new Set([
+  'a','an','the','and','or','but','in','on','at','to','for','of','with','by',
+  'from','is','are','was','were','be','been','being','have','has','had','do',
+  'does','did','will','would','could','should','may','might','shall','can',
+  'that','this','these','those','it','its','as','if','so','not','no','nor',
+  'yet','both','either','neither','each','any','all','some','such','than',
+  'then','when','where','who','which','what','how','also','more','most',
+  'other','into','said','one','two','first','second','said','said',
+]);
+
+const PATENT_ID_RE = /^[A-Z]{2}\d+[A-Z0-9]*$/i;
 
 export default function ConflictView({
   claimText,
@@ -10,6 +22,42 @@ export default function ConflictView({
 }) {
   const [hoveredIndex, setHoveredIndex] = useState(null);
   const [expandedConflict, setExpandedConflict] = useState(null);
+
+  const isPatentIdOnly = useMemo(
+    () => PATENT_ID_RE.test((claimText || '').trim()),
+    [claimText]
+  );
+
+  const claimWordFreq = useMemo(() => {
+    if (!claimText || isPatentIdOnly) return {};
+    const freq = {};
+    claimText.toLowerCase().split(/\W+/).forEach(word => {
+      if (word.length > 3 && !STOP_WORDS.has(word)) {
+        freq[word] = (freq[word] || 0) + 1;
+      }
+    });
+    return freq;
+  }, [claimText, isPatentIdOnly]);
+
+  const maxClaimFreq = useMemo(
+    () => Math.max(...Object.values(claimWordFreq), 1),
+    [claimWordFreq]
+  );
+
+  function renderHeatmap(text) {
+    if (!text) return text;
+    return text.split(/(\s+)/).map((token, idx) => {
+      if (/^\s+$/.test(token)) return token;
+      const clean = token.toLowerCase().replace(/\W/g, '');
+      const freq = claimWordFreq[clean] || 0;
+      if (freq > 0) {
+        const intensity = freq / maxClaimFreq;
+        const cls = intensity > 0.6 ? 'heat-high' : intensity > 0.25 ? 'heat-medium' : 'heat-low';
+        return <span key={idx} className={`heat-word ${cls}`}>{token}</span>;
+      }
+      return token;
+    });
+  }
 
   // Calculate conflict statistics
   const totalConflicts = conflicts.length;
@@ -190,20 +238,41 @@ export default function ConflictView({
             <h3>Patent Claim</h3>
             <span className="pane-badge">Current</span>
           </div>
-          <div className="conflict-text">
-            {highlightText(claimText, conflicts, "left")}
-          </div>
+          {isPatentIdOnly ? (
+            <div className="patent-id-placeholder">
+              <p>Claim text for <strong>{claimText}</strong> could not be loaded.</p>
+              <a
+                href={`https://patents.google.com/patent/${claimText.trim().toUpperCase()}`}
+                target="_blank"
+                rel="noreferrer"
+              >
+                View on Google Patents →
+              </a>
+            </div>
+          ) : (
+            <div className="conflict-text">
+              {highlightText(claimText, conflicts, "left")}
+            </div>
+          )}
         </div>
 
-        {/* RIGHT: PRIOR ART */}
+        {/* RIGHT: PRIOR ART — heatmap of claim keywords */}
         <div className="conflict-pane">
           <div className="pane-header">
             <h3>Prior Art Reference</h3>
             <span className="pane-badge">Existing</span>
           </div>
           <div className="conflict-text">
-            {highlightText(priorArtText, conflicts, "right")}
+            {renderHeatmap(priorArtText)}
           </div>
+          {Object.keys(claimWordFreq).length > 0 && (
+            <div className="heatmap-legend">
+              <span className="legend-label">Keyword match:</span>
+              <span className="heat-word heat-low">low</span>
+              <span className="heat-word heat-medium">medium</span>
+              <span className="heat-word heat-high">high</span>
+            </div>
+          )}
         </div>
       </div>
     </div>

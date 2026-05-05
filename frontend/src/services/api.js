@@ -81,6 +81,7 @@ export async function analyzePatentById({ patentId, targetDate }) {
   return {
     keywords: data.keywords || {},
     results: data.results || [],
+    claim_text: data.claim_text || null,
     status: data.results?.length ? "success" : "no_results",
   };
 }

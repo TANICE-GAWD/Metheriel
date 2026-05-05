@@ -34,13 +34,14 @@ export default function App() {
     setClaimText("");
 
     try {
+      // Auto-detect a bare patent ID even when the user is in paste-claim mode.
+      const looksLikePatentId = /^[A-Z]{2}\d+[A-Z0-9]*$/i.test(query.trim());
       const response =
-        mode === "id"
+        mode === "id" || looksLikePatentId
           ? await analyzePatentById({ patentId: query })
           : await analyzePatent({ claimText: query });
 
-      // For patent-ID mode, the backend returns the scraped claim text.
-      // For paste mode, the user's own input is the claim text.
+      // analyzePatentById always echoes the scraped claim; fall back to raw input only for paste mode.
       setClaimText(response.claim_text || query);
       setData(response);
 
