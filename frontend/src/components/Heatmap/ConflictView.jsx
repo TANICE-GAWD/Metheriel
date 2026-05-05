@@ -1,4 +1,5 @@
 import { useState, useMemo } from "react";
+import ClaimChart from "./ClaimChart";
 import "../../assets/global.css";
 import "./ConflictView.css";
 
@@ -37,6 +38,9 @@ export default function ConflictView({
   conflicts = [],
   confidence = 0.78,
   infringements = [],
+  claimChart = null,
+  sourceTitle = "",
+  sourceUrl = "",
 }) {
   const [hoveredIndex, setHoveredIndex] = useState(null);
   const [expandedConflict, setExpandedConflict] = useState(null);
@@ -324,6 +328,12 @@ export default function ConflictView({
           )}
         </div>
       </div>
+      {/* CLAIM CHART */}
+      <ClaimChart
+        data={claimChart}
+        sourceTitle={sourceTitle}
+        sourceUrl={sourceUrl}
+      />
     </div>
   );
 }

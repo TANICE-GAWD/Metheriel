@@ -166,6 +166,29 @@ export async function analyzePatent({ claimText, targetDate }) {
 
 
 
+export async function generateClaimChart({ claimText, priorArtText, sourceTitle, sourceUrl }) {
+  try {
+    const response = await fetchWithTimeout(
+      `${API_BASE_URL}/v1/claim-chart`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          claim_text: claimText,
+          prior_text: priorArtText,
+          source_title: sourceTitle || "",
+          source_url: sourceUrl || "",
+        }),
+      },
+      22000
+    );
+    if (!response.ok) return null;
+    return await response.json();
+  } catch {
+    return null;
+  }
+}
+
 export async function checkInfringement({ claimText, priorArtText }) {
   try {
     const response = await fetchWithTimeout(

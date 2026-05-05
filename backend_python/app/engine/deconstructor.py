@@ -205,6 +205,62 @@ class Deconstructor:
 
         return await self._ask_llm_question(question)
 
+    async def generate_claim_chart(self, claim_text: str, prior_art_text: str) -> dict:
+        """Element-by-element claim chart: parse claim into limitations, map each to prior art."""
+        claim_snippet = claim_text[:1200] if len(claim_text) > 1200 else claim_text
+        prior_snippet = prior_art_text[:800] if len(prior_art_text) > 800 else prior_art_text
+
+        prompt = (
+            "You are a patent attorney generating a prior-art claim chart.\n\n"
+            "PATENT CLAIM:\n"
+            f"{claim_snippet}\n\n"
+            "PRIOR ART TEXT:\n"
+            f"{prior_snippet}\n\n"
+            "Task:\n"
+            "1. Parse the patent claim into its individual elements/limitations "
+            "(split on semicolons, 'wherein', 'comprising', 'said', 'and' that introduces a new element).\n"
+            "2. For each element, find the most relevant passage from the prior art.\n"
+            "3. Assign confidence 0-100 and status.\n\n"
+            'Return ONLY this JSON:\n'
+            '{"elements":[{"num":1,"element":"exact element text","disclosure":"verbatim prior art passage or Not disclosed","confidence":0-100,"status":"disclosed|partial|absent"}],'
+            '"overall_confidence":0-100,"verdict":"strong|moderate|weak|none"}\n\n'
+            "Rules:\n"
+            "- Parse EVERY element, do not skip any\n"
+            "- disclosed≥70, partial 30-69, absent<30\n"
+            "- disclosure must be verbatim from prior art or the string 'Not disclosed'\n"
+            "- OUTPUT ONLY JSON"
+        )
+
+        body: Dict[str, Any] = {
+            "model": GROQ_MODEL,
+            "messages": [
+                {"role": "system", "content": "You are a strict JSON generator. Output only JSON."},
+                {"role": "user", "content": prompt},
+            ],
+            "temperature": 0,
+            "max_tokens": 700,
+        }
+
+        try:
+            async with httpx.AsyncClient(timeout=INFRINGEMENT_TIMEOUT) as client:
+                resp = await client.post(GROQ_URL, json=body, headers=self._headers)
+        except (httpx.HTTPError, httpx.TimeoutException):
+            return {"elements": [], "overall_confidence": 0, "verdict": "none"}
+
+        if resp.status_code != 200:
+            return {"elements": [], "overall_confidence": 0, "verdict": "none"}
+
+        try:
+            payload = resp.json()
+            choices = payload.get("choices") or []
+            if not choices:
+                return {"elements": [], "overall_confidence": 0, "verdict": "none"}
+            text = (choices[0].get("message", {}).get("content") or "").strip()
+            clean_json = _extract_json(text)
+            return json.loads(clean_json)
+        except (ValueError, json.JSONDecodeError):
+            return {"elements": [], "overall_confidence": 0, "verdict": "none"}
+
     async def analyze_infringement(self, claim_text: str, prior_art_text: str) -> dict:
         """LLM-backed element-by-element analysis: which prior art phrases disclose claim elements."""
         claim_snippet = claim_text[:900] if len(claim_text) > 900 else claim_text

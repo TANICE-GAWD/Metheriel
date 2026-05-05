@@ -43,6 +43,29 @@ class DetailedAnalysisResponse(BaseModel):
     confidence: float
 
 
+class ClaimElement(BaseModel):
+    num: int
+    element: str
+    disclosure: str
+    confidence: int
+    status: str  # "disclosed" | "partial" | "absent"
+
+
+class ClaimChartRequest(BaseModel):
+    claim_text: str
+    prior_text: str
+    source_title: Optional[str] = None
+    source_url: Optional[str] = None
+
+
+class ClaimChartResponse(BaseModel):
+    elements: List[ClaimElement]
+    overall_confidence: int
+    verdict: str  # "strong" | "moderate" | "weak" | "none"
+    source_title: Optional[str] = None
+    source_url: Optional[str] = None
+
+
 class InfringementMatch(BaseModel):
     phrase: str
     element: str

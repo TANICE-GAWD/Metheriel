@@ -26,6 +26,9 @@ from app.models import (
     AnalyzeByPatentRequest,
     AnalyzeRequest,
     AnalyzeResponse,
+    ClaimChartRequest,
+    ClaimChartResponse,
+    ClaimElement,
     Conflict,
     DetailedAnalysisRequest,
     DetailedAnalysisResponse,
@@ -270,6 +273,35 @@ async def analyze_detailed(req: DetailedAnalysisRequest) -> DetailedAnalysisResp
 # ---------------------------------------------------------------------------
 # /v1/infringe-check
 # ---------------------------------------------------------------------------
+
+
+@app.post("/v1/claim-chart", response_model=ClaimChartResponse)
+async def claim_chart(req: ClaimChartRequest) -> ClaimChartResponse:
+    """Generate an element-by-element claim chart mapping patent claim to prior art disclosures."""
+    if not req.claim_text or not req.prior_text:
+        raise HTTPException(status_code=400, detail="claim_text and prior_text are required")
+
+    result = await get_deconstructor().generate_claim_chart(req.claim_text, req.prior_text)
+
+    elements = [
+        ClaimElement(
+            num=e.get("num", i + 1),
+            element=e.get("element", ""),
+            disclosure=e.get("disclosure", "Not disclosed"),
+            confidence=max(0, min(100, int(e.get("confidence", 0)))),
+            status=e.get("status", "absent"),
+        )
+        for i, e in enumerate(result.get("elements", []))
+        if e.get("element")
+    ]
+
+    return ClaimChartResponse(
+        elements=elements,
+        overall_confidence=max(0, min(100, int(result.get("overall_confidence", 0)))),
+        verdict=result.get("verdict", "none"),
+        source_title=req.source_title,
+        source_url=req.source_url,
+    )
 
 
 @app.post("/v1/infringe-check", response_model=InfringementCheckResponse)
