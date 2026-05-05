@@ -1,4 +1,5 @@
 import { useState, useMemo } from "react";
+import { Group, Paper, Text, Badge, Stack, Accordion } from "@mantine/core";
 import ClaimChart from "./ClaimChart";
 import "../../assets/global.css";
 import "./ConflictView.css";
@@ -172,172 +173,192 @@ export default function ConflictView({
 
   return (
     <div className="conflict-wrapper">
-      {/* HEADER WITH METRICS */}
-      <div className="conflict-header">
-        <div className="header-left">
-          <h2>Conflict Analysis</h2>
-          <p className="header-subtitle">
+      {/* METRICS — always visible */}
+      <Group justify="space-between" align="flex-start" mb="md" wrap="wrap" gap="md">
+        <Stack gap={4}>
+          <Text fw={700} size="md">Conflict Analysis</Text>
+          <Text size="sm" c="dimmed">
             {totalConflicts} exact phrase overlap{totalConflicts !== 1 ? "s" : ""} detected
-          </p>
-        </div>
+          </Text>
+        </Stack>
 
-        <div className="header-metrics">
-          <div className="metric-card" title="Jaccard phrase-match score — exact wording overlap between claim and prior art">
-            <div className="metric-value">{Math.round(confidence * 100)}%</div>
-            <div className="metric-label">Phrase Match</div>
-            <div className="metric-sublabel">exact wording</div>
-          </div>
+        <Group gap="sm" wrap="wrap">
+          <Paper withBorder p="sm" radius="sm" ta="center" miw={90}
+            title="Jaccard phrase-match — exact wording overlap">
+            <Text fw={700} size="xl" lh={1}>{Math.round(confidence * 100)}%</Text>
+            <Text size="10px" c="dimmed" tt="uppercase" mt={2} style={{ letterSpacing: '0.4px' }}>Phrase Match</Text>
+            <Text size="9px" c="dimmed" fs="italic">exact wording</Text>
+          </Paper>
 
-          <div className="metric-card">
-            <div className={`metric-badge ${risk.class}`}>
-              {risk.label}
-            </div>
-          </div>
+          <Badge
+            color={risk.class === "risk-high" ? "red" : risk.class === "risk-medium" ? "orange" : "green"}
+            variant="light"
+            size="lg"
+            p="sm"
+          >
+            {risk.label}
+          </Badge>
 
-          <div className="metric-card" title="Semantic match scored element-by-element by AI — see Claim Chart below">
-            <div className="metric-value">
+          <Paper withBorder p="sm" radius="sm" ta="center" miw={90}
+            title="AI element-by-element semantic match — see Claim Chart below">
+            <Text fw={700} size="xl" lh={1}>
               {claimChart ? `${claimChart.overall_confidence}%` : "—"}
-            </div>
-            <div className="metric-label">Semantic Match</div>
-            <div className="metric-sublabel">AI element analysis</div>
-          </div>
-        </div>
-      </div>
+            </Text>
+            <Text size="10px" c="dimmed" tt="uppercase" mt={2} style={{ letterSpacing: '0.4px' }}>Semantic Match</Text>
+            <Text size="9px" c="dimmed" fs="italic">AI analysis</Text>
+          </Paper>
+        </Group>
+      </Group>
 
-      {/* CONFLICT DETAILS TAB */}
-      {totalConflicts > 0 && (
-        <div className="conflict-details-section">
-          <div className="section-title">
-            <span>Identified Conflicts</span>
-            <span className="conflict-count">{totalConflicts}</span>
-          </div>
+      <Accordion multiple variant="separated" radius="sm">
 
-          <div className="conflict-list">
-            {conflicts.map((conflict, idx) => (
-              <div
-                key={idx}
-                className={`conflict-item ${expandedConflict === idx ? "expanded" : ""}`}
-                onMouseEnter={() => setHoveredIndex(idx)}
-                onMouseLeave={() => setHoveredIndex(null)}
-              >
-                <div
-                  className="conflict-item-header"
-                  onClick={() => setExpandedConflict(expandedConflict === idx ? null : idx)}
-                >
-                  <div className="conflict-similarity-bar">
+        {/* IDENTIFIED CONFLICTS */}
+        {totalConflicts > 0 && (
+          <Accordion.Item value="conflicts">
+            <Accordion.Control>
+              <Group gap="xs">
+                <Text fw={600} size="sm">Identified Conflicts</Text>
+                <Badge size="sm" variant="filled" color="red">{totalConflicts}</Badge>
+              </Group>
+            </Accordion.Control>
+            <Accordion.Panel>
+              <div className="conflict-list">
+                {conflicts.map((conflict, idx) => (
+                  <div
+                    key={idx}
+                    className={`conflict-item ${expandedConflict === idx ? "expanded" : ""}`}
+                    onMouseEnter={() => setHoveredIndex(idx)}
+                    onMouseLeave={() => setHoveredIndex(null)}
+                  >
                     <div
-                      className="similarity-fill"
-                      style={{
-                        width: `${conflict.similarity * 100}%`,
-                        backgroundColor:
-                          conflict.similarity > 0.7
-                            ? "#d92d20"
-                            : conflict.similarity > 0.5
-                            ? "#f59e0b"
-                            : "#10b981",
-                      }}
-                    />
-                  </div>
-
-                  <div className="conflict-item-content">
-                    <div className="conflict-preview">
-                      <strong>Claim:</strong> {conflict.claim.substring(0, 60)}
-                      {conflict.claim.length > 60 ? "..." : ""}
+                      className="conflict-item-header"
+                      onClick={() => setExpandedConflict(expandedConflict === idx ? null : idx)}
+                    >
+                      <div className="conflict-similarity-bar">
+                        <div
+                          className="similarity-fill"
+                          style={{
+                            width: `${conflict.similarity * 100}%`,
+                            backgroundColor:
+                              conflict.similarity > 0.7 ? "#d92d20"
+                              : conflict.similarity > 0.5 ? "#f59e0b"
+                              : "#10b981",
+                          }}
+                        />
+                      </div>
+                      <div className="conflict-item-content">
+                        <div className="conflict-preview">
+                          <strong>Claim:</strong> {conflict.claim.substring(0, 60)}
+                          {conflict.claim.length > 60 ? "..." : ""}
+                        </div>
+                        <div className="similarity-score">
+                          Similarity: {(conflict.similarity * 100).toFixed(0)}%
+                        </div>
+                      </div>
+                      <div className="expand-icon">{expandedConflict === idx ? "−" : "+"}</div>
                     </div>
-                    <div className="similarity-score">
-                      Similarity: {(conflict.similarity * 100).toFixed(0)}%
-                    </div>
-                  </div>
 
-                  <div className="expand-icon">
-                    {expandedConflict === idx ? "−" : "+"}
+                    {expandedConflict === idx && (
+                      <div className="conflict-item-details">
+                        <div className="detail-row">
+                          <span className="detail-label">From Patent Claim:</span>
+                          <span className="detail-text">{conflict.claim}</span>
+                        </div>
+                        <div className="detail-row">
+                          <span className="detail-label">In Prior Art:</span>
+                          <span className="detail-text">{conflict.prior}</span>
+                        </div>
+                        <div className="detail-row">
+                          <span className="detail-label">Overlap Strength:</span>
+                          <span className="detail-strength">
+                            {conflict.similarity > 0.7 ? "High" : conflict.similarity > 0.5 ? "Medium" : "Low"}
+                          </span>
+                        </div>
+                      </div>
+                    )}
                   </div>
+                ))}
+              </div>
+            </Accordion.Panel>
+          </Accordion.Item>
+        )}
+
+        {/* SIDE-BY-SIDE COMPARISON */}
+        <Accordion.Item value="comparison">
+          <Accordion.Control>
+            <Text fw={600} size="sm">Patent Claim vs Prior Art</Text>
+          </Accordion.Control>
+          <Accordion.Panel>
+            <div className="conflict-container">
+              <div className="conflict-pane">
+                <div className="pane-header">
+                  <h3>Patent Claim</h3>
+                  <Badge variant="filled" color="dark" size="sm">Current</Badge>
                 </div>
-
-                {expandedConflict === idx && (
-                  <div className="conflict-item-details">
-                    <div className="detail-row">
-                      <span className="detail-label">From Patent Claim:</span>
-                      <span className="detail-text">{conflict.claim}</span>
-                    </div>
-                    <div className="detail-row">
-                      <span className="detail-label">In Prior Art:</span>
-                      <span className="detail-text">{conflict.prior}</span>
-                    </div>
-                    <div className="detail-row">
-                      <span className="detail-label">Overlap Strength:</span>
-                      <span className="detail-strength">
-                        {conflict.similarity > 0.7
-                          ? "High"
-                          : conflict.similarity > 0.5
-                          ? "Medium"
-                          : "Low"}
-                      </span>
-                    </div>
+                {isPatentIdOnly ? (
+                  <div className="patent-id-placeholder">
+                    <p>Claim text for <strong>{claimText}</strong> could not be loaded.</p>
+                    <a
+                      href={`https://patents.google.com/patent/${claimText.trim().toUpperCase()}`}
+                      target="_blank"
+                      rel="noreferrer"
+                    >
+                      View on Google Patents →
+                    </a>
+                  </div>
+                ) : (
+                  <div className="conflict-text">
+                    {highlightText(claimText, conflicts, "left")}
                   </div>
                 )}
               </div>
-            ))}
-          </div>
-        </div>
-      )}
 
-      {/* SIDE-BY-SIDE COMPARISON */}
-      <div className="conflict-container">
-        {/* LEFT: CLAIM */}
-        <div className="conflict-pane">
-          <div className="pane-header">
-            <h3>Patent Claim</h3>
-            <span className="pane-badge">Current</span>
-          </div>
-          {isPatentIdOnly ? (
-            <div className="patent-id-placeholder">
-              <p>Claim text for <strong>{claimText}</strong> could not be loaded.</p>
-              <a
-                href={`https://patents.google.com/patent/${claimText.trim().toUpperCase()}`}
-                target="_blank"
-                rel="noreferrer"
-              >
-                View on Google Patents →
-              </a>
+              <div className="conflict-pane">
+                <div className="pane-header">
+                  <h3>Prior Art Reference</h3>
+                  <Badge variant="filled" color="gray" size="sm">Existing</Badge>
+                </div>
+                <div className="conflict-text">
+                  {renderInfringementText(priorArtText)}
+                </div>
+                {infringements?.length > 0 ? (
+                  <div className="heatmap-legend">
+                    <span className="legend-label">Infringement risk:</span>
+                    <span className="infringe-phrase infringe-low">low</span>
+                    <span className="infringe-phrase infringe-medium">medium</span>
+                    <span className="infringe-phrase infringe-high">high</span>
+                  </div>
+                ) : claimStems.size > 0 && (
+                  <div className="heatmap-legend">
+                    <span className="legend-label">Keyword match:</span>
+                    <span className="heat-word heat-medium">matched term</span>
+                  </div>
+                )}
+              </div>
             </div>
-          ) : (
-            <div className="conflict-text">
-              {highlightText(claimText, conflicts, "left")}
-            </div>
-          )}
-        </div>
+          </Accordion.Panel>
+        </Accordion.Item>
 
-        {/* RIGHT: PRIOR ART — infringement inference or keyword heatmap */}
-        <div className="conflict-pane">
-          <div className="pane-header">
-            <h3>Prior Art Reference</h3>
-            <span className="pane-badge">Existing</span>
-          </div>
-          <div className="conflict-text">
-            {renderInfringementText(priorArtText)}
-          </div>
-          {infringements?.length > 0 ? (
-            <div className="heatmap-legend">
-              <span className="legend-label">Infringement risk:</span>
-              <span className="infringe-phrase infringe-low">low</span>
-              <span className="infringe-phrase infringe-medium">medium</span>
-              <span className="infringe-phrase infringe-high">high</span>
-            </div>
-          ) : claimStems.size > 0 && (
-            <div className="heatmap-legend">
-              <span className="legend-label">Keyword match:</span>
-              <span className="heat-word heat-medium">matched term</span>
-            </div>
-          )}
-        </div>
-      </div>
-      {/* CLAIM CHART */}
-      <ClaimChart
-        data={claimChart}
-        sourceTitle={sourceTitle}
-        sourceUrl={sourceUrl}
-      />
+        {/* CLAIM CHART */}
+        {claimChart?.elements?.length > 0 && (
+          <Accordion.Item value="claimchart">
+            <Accordion.Control>
+              <Group gap="xs">
+                <Text fw={600} size="sm">Claim Chart</Text>
+                <Badge size="sm" variant="light" color="blue">{claimChart.elements.length} elements</Badge>
+              </Group>
+            </Accordion.Control>
+            <Accordion.Panel>
+              <ClaimChart
+                data={claimChart}
+                sourceTitle={sourceTitle}
+                sourceUrl={sourceUrl}
+              />
+            </Accordion.Panel>
+          </Accordion.Item>
+        )}
+
+      </Accordion>
     </div>
   );
 }

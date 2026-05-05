@@ -1,37 +1,26 @@
-import { useState } from "react";
-import "./ClaimChart.css";
+import { useState } from 'react';
+import {
+  Table, Badge, Progress, Button, Text, Group, Stack,
+  Paper, Anchor, Tooltip, Collapse,
+} from '@mantine/core';
+import './ClaimChart.css';
 
-const VERDICT_META = {
-  strong:   { label: "Strong Prior Art",   cls: "verdict-strong"   },
-  moderate: { label: "Moderate Prior Art", cls: "verdict-moderate" },
-  weak:     { label: "Weak Prior Art",     cls: "verdict-weak"     },
-  none:     { label: "No Match Found",     cls: "verdict-none"     },
+const STATUS = {
+  disclosed: { color: 'green',  icon: '✓', label: 'Disclosed' },
+  partial:   { color: 'orange', icon: '◑', label: 'Partial'   },
+  absent:    { color: 'red',    icon: '✗', label: 'Absent'    },
 };
 
-const STATUS_META = {
-  disclosed: { icon: "✓", cls: "status-disclosed", label: "Disclosed"  },
-  partial:   { icon: "◑", cls: "status-partial",   label: "Partial"    },
-  absent:    { icon: "✗", cls: "status-absent",     label: "Absent"     },
+const VERDICT = {
+  strong:   { color: 'green',  label: 'Strong Prior Art'   },
+  moderate: { color: 'orange', label: 'Moderate Prior Art' },
+  weak:     { color: 'red',    label: 'Weak Prior Art'     },
+  none:     { color: 'gray',   label: 'No Match Found'     },
 };
-
-function ConfidenceBar({ value }) {
-  const color =
-    value >= 70 ? "#15803d" :
-    value >= 40 ? "#b45309" : "#b91c1c";
-  return (
-    <div className="conf-bar-wrap">
-      <div
-        className="conf-bar-fill"
-        style={{ width: `${value}%`, background: color }}
-      />
-      <span className="conf-bar-label" style={{ color }}>{value}%</span>
-    </div>
-  );
-}
 
 function exportCSV(elements, sourceTitle) {
   const rows = [
-    ["#", "Claim Element", "Prior Art Disclosure", "Confidence (%)", "Status"],
+    ['#', 'Claim Element', 'Prior Art Disclosure', 'Confidence (%)', 'Status'],
     ...elements.map(el => [
       el.num,
       `"${el.element.replace(/"/g, '""')}"`,
@@ -40,125 +29,136 @@ function exportCSV(elements, sourceTitle) {
       el.status,
     ]),
   ];
-  const csv = rows.map(r => r.join(",")).join("\n");
-  const blob = new Blob([csv], { type: "text/csv" });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = `claim-chart-${sourceTitle ? sourceTitle.slice(0, 30).replace(/\s+/g, "-") : "export"}.csv`;
+  const csv = rows.map(r => r.join(',')).join('\n');
+  const blob = new Blob([csv], { type: 'text/csv' });
+  const url  = URL.createObjectURL(blob);
+  const a    = document.createElement('a');
+  a.href     = url;
+  a.download = `claim-chart-${(sourceTitle || 'export').slice(0, 30).replace(/\s+/g, '-')}.csv`;
   a.click();
   URL.revokeObjectURL(url);
 }
 
 export default function ClaimChart({ data, sourceTitle, sourceUrl }) {
-  const [expanded, setExpanded] = useState(null);
+  const [openRow, setOpenRow] = useState(null);
 
-  if (!data) return null;
+  if (!data || !data.elements?.length) return null;
 
-  const { elements = [], overall_confidence = 0, verdict = "none" } = data;
-  const verdictMeta = VERDICT_META[verdict] || VERDICT_META.none;
+  const { elements, overall_confidence = 0, verdict = 'none' } = data;
+  const vm = VERDICT[verdict] || VERDICT.none;
 
-  const disclosed = elements.filter(e => e.status === "disclosed").length;
-  const partial   = elements.filter(e => e.status === "partial").length;
-  const absent    = elements.filter(e => e.status === "absent").length;
+  const disclosed = elements.filter(e => e.status === 'disclosed').length;
+  const partial   = elements.filter(e => e.status === 'partial').length;
+  const absent    = elements.filter(e => e.status === 'absent').length;
 
   return (
-    <div className="claim-chart-wrapper">
-      {/* ── HEADER ── */}
-      <div className="cc-header">
-        <div className="cc-header-left">
-          <h2 className="cc-title">Claim Chart</h2>
+    <Stack gap="md">
+      {/* Header */}
+      <Group justify="space-between" wrap="wrap" gap="sm">
+        <Stack gap={4}>
+          <Text fw={700} size="lg">Claim Chart</Text>
           {sourceTitle && (
-            <p className="cc-source">
-              vs.{" "}
+            <Text size="sm" c="dimmed">
+              vs.{' '}
               {sourceUrl
-                ? <a href={sourceUrl} target="_blank" rel="noreferrer">{sourceTitle}</a>
+                ? <Anchor href={sourceUrl} target="_blank" rel="noreferrer" size="sm">{sourceTitle}</Anchor>
                 : sourceTitle}
-            </p>
+            </Text>
           )}
-        </div>
+        </Stack>
 
-        <div className="cc-header-right">
-          <div className={`cc-verdict ${verdictMeta.cls}`}>{verdictMeta.label}</div>
+        <Group gap="sm" wrap="wrap">
+          <Badge color={vm.color} variant="light" size="lg">{vm.label}</Badge>
 
-          <div className="cc-overall">
-            <div className="cc-overall-value">{overall_confidence}%</div>
-            <div className="cc-overall-label">Overall Match</div>
-          </div>
+          <Paper withBorder p="xs" radius="sm" ta="center" miw={90}>
+            <Text fw={700} size="xl" lh={1}>{overall_confidence}%</Text>
+            <Text size="10px" c="dimmed" tt="uppercase" style={{ letterSpacing: '0.4px' }}>
+              Semantic Match
+            </Text>
+          </Paper>
 
-          <button
-            className="cc-export-btn"
+          <Button
+            variant="outline"
+            color="blue"
+            size="xs"
             onClick={() => exportCSV(elements, sourceTitle)}
-            title="Download as CSV"
           >
             ↓ Export CSV
-          </button>
-        </div>
-      </div>
+          </Button>
+        </Group>
+      </Group>
 
-      {/* ── SUMMARY PILLS ── */}
-      <div className="cc-summary">
-        <span className="cc-pill pill-disclosed">✓ {disclosed} Disclosed</span>
-        <span className="cc-pill pill-partial">◑ {partial} Partial</span>
-        <span className="cc-pill pill-absent">✗ {absent} Absent</span>
-        <span className="cc-pill pill-total">{elements.length} Elements Total</span>
-      </div>
+      {/* Summary pills */}
+      <Group gap="xs" wrap="wrap">
+        <Badge color="green"  variant="light">✓ {disclosed} Disclosed</Badge>
+        <Badge color="orange" variant="light">◑ {partial} Partial</Badge>
+        <Badge color="red"    variant="light">✗ {absent} Absent</Badge>
+        <Badge color="gray"   variant="outline">{elements.length} Elements</Badge>
+      </Group>
 
-      {/* ── TABLE ── */}
-      <div className="cc-table-wrap">
-        <table className="cc-table">
-          <thead>
-            <tr>
-              <th className="col-num">#</th>
-              <th className="col-element">Claim Element</th>
-              <th className="col-disclosure">Prior Art Disclosure</th>
-              <th className="col-conf">Match</th>
-              <th className="col-status">Status</th>
-            </tr>
-          </thead>
-          <tbody>
+      {/* Table */}
+      <Paper withBorder radius="md" style={{ overflow: 'hidden' }}>
+        <Table striped highlightOnHover withColumnBorders={false} verticalSpacing="sm">
+          <Table.Thead style={{ background: '#1a1a2e' }}>
+            <Table.Tr>
+              <Table.Th style={{ color: '#fff', width: 40, textAlign: 'center' }}>#</Table.Th>
+              <Table.Th style={{ color: '#fff', width: '32%' }}>Claim Element</Table.Th>
+              <Table.Th style={{ color: '#fff' }}>Prior Art Disclosure</Table.Th>
+              <Table.Th style={{ color: '#fff', width: 110 }}>Match</Table.Th>
+              <Table.Th style={{ color: '#fff', width: 110 }}>Status</Table.Th>
+            </Table.Tr>
+          </Table.Thead>
+          <Table.Tbody>
             {elements.map((el, idx) => {
-              const sm = STATUS_META[el.status] || STATUS_META.absent;
-              const isOpen = expanded === idx;
+              const sm      = STATUS[el.status] || STATUS.absent;
+              const isOpen  = openRow === idx;
+              const barColor = el.confidence >= 70 ? 'green' : el.confidence >= 40 ? 'orange' : 'red';
               return (
-                <tr
-                  key={idx}
-                  className={`cc-row cc-row-${el.status} ${isOpen ? "cc-row-open" : ""}`}
-                  onClick={() => setExpanded(isOpen ? null : idx)}
-                >
-                  <td className="col-num">{el.num}</td>
+                <>
+                  <Table.Tr
+                    key={idx}
+                    onClick={() => setOpenRow(isOpen ? null : idx)}
+                    style={{ cursor: 'pointer', borderLeft: `3px solid var(--mantine-color-${sm.color}-6)` }}
+                  >
+                    <Table.Td ta="center">
+                      <Text size="xs" fw={600} c="dimmed">{el.num}</Text>
+                    </Table.Td>
 
-                  <td className="col-element">
-                    <div className={`cc-element-text ${isOpen ? "" : "cc-clamp"}`}>
-                      {el.element}
-                    </div>
-                  </td>
+                    <Table.Td>
+                      <Text size="xs" fs="italic" c="dark" lineClamp={isOpen ? undefined : 2}>
+                        {el.element}
+                      </Text>
+                    </Table.Td>
 
-                  <td className="col-disclosure">
-                    {el.disclosure === "Not disclosed" ? (
-                      <span className="no-disclosure">Not disclosed</span>
-                    ) : (
-                      <div className={`cc-disclosure-text ${isOpen ? "" : "cc-clamp"}`}>
-                        "{el.disclosure}"
-                      </div>
-                    )}
-                  </td>
+                    <Table.Td>
+                      {el.disclosure === 'Not disclosed' ? (
+                        <Text size="xs" c="red" fs="italic">Not disclosed</Text>
+                      ) : (
+                        <Text size="xs" c="dimmed" lineClamp={isOpen ? undefined : 2}>
+                          "{el.disclosure}"
+                        </Text>
+                      )}
+                    </Table.Td>
 
-                  <td className="col-conf">
-                    <ConfidenceBar value={el.confidence} />
-                  </td>
+                    <Table.Td>
+                      <Stack gap={4}>
+                        <Progress value={el.confidence} color={barColor} size="sm" radius="xs" />
+                        <Text size="10px" fw={600} c={barColor}>{el.confidence}%</Text>
+                      </Stack>
+                    </Table.Td>
 
-                  <td className="col-status">
-                    <span className={`cc-status-badge ${sm.cls}`}>
-                      {sm.icon} {sm.label}
-                    </span>
-                  </td>
-                </tr>
+                    <Table.Td>
+                      <Badge color={sm.color} variant="light" size="sm">
+                        {sm.icon} {sm.label}
+                      </Badge>
+                    </Table.Td>
+                  </Table.Tr>
+                </>
               );
             })}
-          </tbody>
-        </table>
-      </div>
-    </div>
+          </Table.Tbody>
+        </Table>
+      </Paper>
+    </Stack>
   );
 }
