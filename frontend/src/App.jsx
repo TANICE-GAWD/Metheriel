@@ -3,7 +3,7 @@ import { analyzePatent } from "./services/api";
 import ResultCard from "./components/Results/ResultCard";
 import "./assets/global.css";
 import "./App.css";
-import { Analytics } from "@vercel/analytics/next"
+import { Analytics } from "@vercel/analytics/react"
 
 export default function App() {
   
