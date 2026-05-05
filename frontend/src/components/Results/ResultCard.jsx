@@ -59,42 +59,73 @@ export default function ResultCard({ result, claimText }) {
   return (
     <div className={`result-card ${getScoreClass()}`}>
 
+      {/* TOP BAR WITH INDICATORS */}
+      <div className="result-top-bar">
+        <div className="result-badge-group">
+          <span className="source-badge">{result.source}</span>
+          <span className="language-badge">{result.language}</span>
+        </div>
+        <div className="result-date">
+          {new Date(result.date).toLocaleDateString("en-US", {
+            year: "numeric",
+            month: "short",
+            day: "numeric",
+          })}
+        </div>
+      </div>
+
       {/* HEADER */}
       <div className="result-header">
-        <a href={result.url} target="_blank" rel="noreferrer">
+        <a href={result.url} target="_blank" rel="noreferrer" className="result-title">
           {result.title}
         </a>
-
-        <div className="result-meta">
-          <span>{result.source}</span>
-          <span>
-            {new Date(result.date).toLocaleDateString()}
-          </span>
-        </div>
       </div>
 
       {/* SNIPPET */}
       <p className="result-snippet">
-        {result.snippet}
+        {result.snippet.length > 300
+          ? result.snippet.substring(0, 300) + "..."
+          : result.snippet}
       </p>
 
-      {/* ACTION */}
-      <button
-        className="button-primary"
-        onClick={handleToggle}
-        disabled={loading}
-      >
-        {loading
-          ? "Analyzing..."
-          : isExpanded
-          ? "Hide Analysis"
-          : "View Analysis"}
-      </button>
+      {/* ACTION BUTTONS */}
+      <div className="result-actions">
+        <button
+          className="button-analyze"
+          onClick={handleToggle}
+          disabled={loading}
+        >
+          {loading ? (
+            <>
+              <span className="spinner"></span>
+              Analyzing...
+            </>
+          ) : isExpanded ? (
+            <>
+              ✕ Hide Analysis
+            </>
+          ) : (
+            <>
+              → View Conflict Analysis
+            </>
+          )}
+        </button>
+
+        <a
+          href={result.url}
+          target="_blank"
+          rel="noreferrer"
+          className="button-external"
+          title="Open in new tab"
+        >
+          ↗
+        </a>
+      </div>
 
       {/* ERROR */}
       {error && (
-        <div className="error-text">
-          {error}
+        <div className="result-error">
+          <strong>Error:</strong> {error}
         </div>
       )}
 

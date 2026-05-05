@@ -224,10 +224,12 @@ func AnalyzeHandler(decon *engine.Deconstructor) http.HandlerFunc {
 		
 		
 
+		log.Printf("Starting search with providers: %v", search.GetProviderNames())
 		results, err := search.MultiSearch(ctx, query)
 		if err != nil {
 			log.Println("search warning:", err) 
 		}
+		log.Printf("Search completed: found %d results", len(results))
 
 		// Apply relevance filter using domain matching
 		var filtered []search.SearchResult

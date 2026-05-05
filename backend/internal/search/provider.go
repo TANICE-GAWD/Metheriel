@@ -3,6 +3,7 @@ package search
 import (
 	"context"
 	"errors"
+	"log"
 	"sync"
 	"time"
 )
@@ -76,6 +77,17 @@ func GetProviders() []SearchProvider {
 	return list
 }
 
+func GetProviderNames() []string {
+	providersMu.RLock()
+	defer providersMu.RUnlock()
+
+	names := make([]string, 0, len(providers))
+	for name := range providers {
+		names = append(names, name)
+	}
+	return names
+}
+
 
 
 
@@ -86,6 +98,8 @@ func MultiSearch(ctx context.Context, query SearchQuery) ([]SearchResult, error)
 	if len(ps) == 0 {
 		return nil, errors.New("no search providers registered")
 	}
+
+	log.Printf("Running %d search providers", len(ps))
 
 	var wg sync.WaitGroup
 	resultCh := make(chan []SearchResult, len(ps))
@@ -102,12 +116,15 @@ func MultiSearch(ctx context.Context, query SearchQuery) ([]SearchResult, error)
 			providerCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
 			defer cancel()
 
+			log.Printf("Starting search provider: %s", p.Name())
 			results, err := p.Search(providerCtx, query)
 			if err != nil {
+				log.Printf("Provider %s error: %v", p.Name(), err)
 				errCh <- err
 				return
 			}
 
+			log.Printf("Provider %s returned %d results", p.Name(), len(results))
 			resultCh <- results
 		}(provider)
 	}
