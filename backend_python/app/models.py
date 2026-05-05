@@ -41,3 +41,18 @@ class Conflict(BaseModel):
 class DetailedAnalysisResponse(BaseModel):
     conflicts: List[Conflict]
     confidence: float
+
+
+class InfringementMatch(BaseModel):
+    phrase: str
+    element: str
+    strength: str  # "high" | "medium" | "low"
+
+
+class InfringementCheckRequest(BaseModel):
+    claim_text: str
+    prior_text: str
+
+
+class InfringementCheckResponse(BaseModel):
+    matches: List[InfringementMatch]

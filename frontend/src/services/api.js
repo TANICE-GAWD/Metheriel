@@ -166,6 +166,27 @@ export async function analyzePatent({ claimText, targetDate }) {
 
 
 
+export async function checkInfringement({ claimText, priorArtText }) {
+  try {
+    const response = await fetchWithTimeout(
+      `${API_BASE_URL}/v1/infringe-check`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          claim_text: claimText,
+          prior_text: priorArtText,
+        }),
+      },
+      20000
+    );
+    if (!response.ok) return { matches: [] };
+    return await response.json();
+  } catch {
+    return { matches: [] };
+  }
+}
+
 export async function getDetailedAnalysis({
   claimText,
   priorArtText,

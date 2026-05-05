@@ -1,6 +1,6 @@
 import { useState } from "react";
 import ConflictView from "../Heatmap/ConflictView";
-import { getDetailedAnalysis } from "../../services/api";
+import { getDetailedAnalysis, checkInfringement } from "../../services/api";
 import "./ResultCard.css";
 
 export default function ResultCard({ result, claimText }) {
@@ -27,12 +27,12 @@ export default function ResultCard({ result, claimText }) {
     setError("");
 
     try {
-      const data = await getDetailedAnalysis({
-        claimText,
-        priorArtText: result.snippet,
-      });
+      const [data, infringement] = await Promise.all([
+        getDetailedAnalysis({ claimText, priorArtText: result.snippet }),
+        checkInfringement({ claimText, priorArtText: result.snippet }),
+      ]);
 
-      setAnalysis(data);
+      setAnalysis({ ...data, infringements: infringement.matches || [] });
     } catch (err) {
       setError(err.message);
     } finally {
@@ -136,6 +136,7 @@ export default function ResultCard({ result, claimText }) {
           priorArtText={result.snippet}
           conflicts={analysis.conflicts}
           confidence={analysis.confidence}
+          infringements={analysis.infringements || []}
         />
       )}
 

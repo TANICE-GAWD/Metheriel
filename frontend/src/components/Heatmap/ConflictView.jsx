@@ -14,11 +14,29 @@ const STOP_WORDS = new Set([
 
 const PATENT_ID_RE = /^[A-Z]{2}\d+[A-Z0-9]*$/i;
 
+// Simple suffix stemmer for English technical vocabulary
+function stem(word) {
+  const rules = [
+    ['ations', 5], ['ation', 5], ['tions', 5], ['tion', 4],
+    ['ings', 4], ['ing', 3], ['ments', 5], ['ment', 4],
+    ['ated', 4], ['ness', 4], ['ions', 4], ['ion', 3],
+    ['ers', 3], ['ous', 3], ['ive', 3], ['ful', 3],
+    ['al', 2], ['ed', 2], ['ly', 2], ['er', 2], ['es', 2], ['s', 1],
+  ];
+  for (const [suffix, minRemaining] of rules) {
+    if (word.endsWith(suffix) && word.length - suffix.length >= minRemaining) {
+      return word.slice(0, -suffix.length);
+    }
+  }
+  return word;
+}
+
 export default function ConflictView({
   claimText,
   priorArtText,
   conflicts = [],
   confidence = 0.78,
+  infringements = [],
 }) {
   const [hoveredIndex, setHoveredIndex] = useState(null);
   const [expandedConflict, setExpandedConflict] = useState(null);
@@ -28,35 +46,61 @@ export default function ConflictView({
     [claimText]
   );
 
-  const claimWordFreq = useMemo(() => {
-    if (!claimText || isPatentIdOnly) return {};
-    const freq = {};
+  // Build a set of stems from claim words for stem-based matching
+  const claimStems = useMemo(() => {
+    if (!claimText || isPatentIdOnly) return new Set();
+    const stems = new Set();
     claimText.toLowerCase().split(/\W+/).forEach(word => {
       if (word.length > 3 && !STOP_WORDS.has(word)) {
-        freq[word] = (freq[word] || 0) + 1;
+        stems.add(stem(word));
       }
     });
-    return freq;
+    return stems;
   }, [claimText, isPatentIdOnly]);
-
-  const maxClaimFreq = useMemo(
-    () => Math.max(...Object.values(claimWordFreq), 1),
-    [claimWordFreq]
-  );
 
   function renderHeatmap(text) {
     if (!text) return text;
     return text.split(/(\s+)/).map((token, idx) => {
       if (/^\s+$/.test(token)) return token;
       const clean = token.toLowerCase().replace(/\W/g, '');
-      const freq = claimWordFreq[clean] || 0;
-      if (freq > 0) {
-        const intensity = freq / maxClaimFreq;
-        const cls = intensity > 0.6 ? 'heat-high' : intensity > 0.25 ? 'heat-medium' : 'heat-low';
-        return <span key={idx} className={`heat-word ${cls}`}>{token}</span>;
+      if (clean.length > 3 && !STOP_WORDS.has(clean) && claimStems.has(stem(clean))) {
+        return <span key={idx} className="heat-word heat-medium">{token}</span>;
       }
       return token;
     });
+  }
+
+  // Render prior art with LLM-identified infringement phrases highlighted by strength
+  function renderInfringementText(text) {
+    if (!text) return text;
+    if (!infringements?.length) return renderHeatmap(text);
+
+    let parts = [text];
+    infringements.forEach((match, mIdx) => {
+      if (!match.phrase) return;
+      parts = parts.flatMap(part => {
+        if (typeof part !== 'string') return [part];
+        const split = part.split(match.phrase);
+        if (split.length === 1) return [part];
+        const result = [];
+        split.forEach((s, i) => {
+          result.push(s);
+          if (i < split.length - 1) {
+            result.push(
+              <span
+                key={`inf-${mIdx}-${i}`}
+                className={`infringe-phrase infringe-${match.strength || 'low'}`}
+                title={`Claim element: ${match.element}`}
+              >
+                {match.phrase}
+              </span>
+            );
+          }
+        });
+        return result;
+      });
+    });
+    return parts;
   }
 
   // Calculate conflict statistics
@@ -256,21 +300,26 @@ export default function ConflictView({
           )}
         </div>
 
-        {/* RIGHT: PRIOR ART — heatmap of claim keywords */}
+        {/* RIGHT: PRIOR ART — infringement inference or keyword heatmap */}
         <div className="conflict-pane">
           <div className="pane-header">
             <h3>Prior Art Reference</h3>
             <span className="pane-badge">Existing</span>
           </div>
           <div className="conflict-text">
-            {renderHeatmap(priorArtText)}
+            {renderInfringementText(priorArtText)}
           </div>
-          {Object.keys(claimWordFreq).length > 0 && (
+          {infringements?.length > 0 ? (
+            <div className="heatmap-legend">
+              <span className="legend-label">Infringement risk:</span>
+              <span className="infringe-phrase infringe-low">low</span>
+              <span className="infringe-phrase infringe-medium">medium</span>
+              <span className="infringe-phrase infringe-high">high</span>
+            </div>
+          ) : claimStems.size > 0 && (
             <div className="heatmap-legend">
               <span className="legend-label">Keyword match:</span>
-              <span className="heat-word heat-low">low</span>
-              <span className="heat-word heat-medium">medium</span>
-              <span className="heat-word heat-high">high</span>
+              <span className="heat-word heat-medium">matched term</span>
             </div>
           )}
         </div>

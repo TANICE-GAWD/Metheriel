@@ -29,6 +29,9 @@ from app.models import (
     Conflict,
     DetailedAnalysisRequest,
     DetailedAnalysisResponse,
+    InfringementCheckRequest,
+    InfringementCheckResponse,
+    InfringementMatch,
 )
 from app.patents.google_patents import fetch_claim_text, normalize_patent_input
 from app.search import (
@@ -262,6 +265,32 @@ async def analyze_detailed(req: DetailedAnalysisRequest) -> DetailedAnalysisResp
     confidence = _calculate_confidence(conflicts, len(claim_phrases))
 
     return DetailedAnalysisResponse(conflicts=conflicts, confidence=confidence)
+
+
+# ---------------------------------------------------------------------------
+# /v1/infringe-check
+# ---------------------------------------------------------------------------
+
+
+@app.post("/v1/infringe-check", response_model=InfringementCheckResponse)
+async def infringe_check(req: InfringementCheckRequest) -> InfringementCheckResponse:
+    """LLM-powered element-by-element analysis: which prior art phrases disclose patent claim elements."""
+    if not req.claim_text or not req.prior_text:
+        raise HTTPException(status_code=400, detail="claim_text and prior_text are required")
+
+    result = await get_deconstructor().analyze_infringement(req.claim_text, req.prior_text)
+
+    matches = [
+        InfringementMatch(
+            phrase=m["phrase"],
+            element=m.get("element", ""),
+            strength=m.get("strength", "low"),
+        )
+        for m in result.get("matches", [])
+        if m.get("phrase")
+    ]
+
+    return InfringementCheckResponse(matches=matches)
 
 
 # ---------------------------------------------------------------------------

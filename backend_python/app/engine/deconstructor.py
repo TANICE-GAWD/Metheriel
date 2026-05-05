@@ -27,6 +27,7 @@ GROQ_MODEL = "llama-3.1-8b-instant"
 
 DECONSTRUCT_TIMEOUT = 12.0
 RELEVANCE_TIMEOUT = 8.0
+INFRINGEMENT_TIMEOUT = 15.0
 
 
 def _build_prompt(claim: str) -> str:
@@ -203,6 +204,63 @@ class Deconstructor:
         )
 
         return await self._ask_llm_question(question)
+
+    async def analyze_infringement(self, claim_text: str, prior_art_text: str) -> dict:
+        """LLM-backed element-by-element analysis: which prior art phrases disclose claim elements."""
+        claim_snippet = claim_text[:900] if len(claim_text) > 900 else claim_text
+        prior_snippet = prior_art_text[:700] if len(prior_art_text) > 700 else prior_art_text
+
+        prompt = (
+            "You are a patent examiner checking whether prior art discloses patent claim elements.\n\n"
+            "PATENT CLAIM:\n"
+            f"{claim_snippet}\n\n"
+            "PRIOR ART TEXT:\n"
+            f"{prior_snippet}\n\n"
+            "Find phrases from the PRIOR ART TEXT that technically disclose elements of the patent claim.\n"
+            "Each phrase MUST appear VERBATIM in the prior art text (copy it exactly).\n\n"
+            'OUTPUT ONLY JSON:\n'
+            '{"matches":[{"phrase":"verbatim phrase from prior art","element":"claim element it discloses","strength":"high|medium|low"}]}\n\n'
+            "strength: high=direct technical disclosure, medium=related concept, low=tangential mention\n"
+            "Return empty matches if no genuine technical overlap.\n"
+            "OUTPUT ONLY JSON:"
+        )
+
+        body: Dict[str, Any] = {
+            "model": GROQ_MODEL,
+            "messages": [
+                {"role": "system", "content": "You are a strict JSON generator. Output only JSON."},
+                {"role": "user", "content": prompt},
+            ],
+            "temperature": 0,
+            "max_tokens": 500,
+        }
+
+        try:
+            async with httpx.AsyncClient(timeout=INFRINGEMENT_TIMEOUT) as client:
+                resp = await client.post(GROQ_URL, json=body, headers=self._headers)
+        except (httpx.HTTPError, httpx.TimeoutException):
+            return {"matches": []}
+
+        if resp.status_code != 200:
+            return {"matches": []}
+
+        try:
+            payload = resp.json()
+            choices = payload.get("choices") or []
+            if not choices:
+                return {"matches": []}
+            text = (choices[0].get("message", {}).get("content") or "").strip()
+            clean_json = _extract_json(text)
+            result = json.loads(clean_json)
+            # Only keep phrases that actually appear verbatim in the prior art
+            prior_lower = prior_art_text.lower()
+            verified = [
+                m for m in result.get("matches", [])
+                if m.get("phrase") and m["phrase"].lower() in prior_lower
+            ]
+            return {"matches": verified}
+        except (ValueError, json.JSONDecodeError, KeyError):
+            return {"matches": []}
 
     async def is_relevant_legacy(self, intent: str, snippet: str) -> bool:
         """Legacy intent-based relevance check, preserved for backward compatibility."""
