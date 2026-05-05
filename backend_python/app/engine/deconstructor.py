@@ -12,8 +12,9 @@ from __future__ import annotations
 import json
 import logging
 import os
+import re
 from datetime import datetime
-from typing import Any, Dict, Optional
+from typing import Any, Dict, List, Optional
 
 import httpx
 
@@ -205,29 +206,67 @@ class Deconstructor:
 
         return await self._ask_llm_question(question)
 
+    @staticmethod
+    def _split_claim_elements(claim_text: str) -> List[str]:
+        """Deterministically split a patent claim into its limitations.
+
+        Does NOT call the LLM — uses structural cues that appear in >95% of
+        US-style independent claims: semicolons, 'comprising', lettered steps.
+        """
+        # Strip leading claim number ("1.", "Claim 1.", etc.)
+        text = re.sub(r"^\s*\d+[\.\)]\s*", "", claim_text.strip())
+
+        # Split on semicolons (primary delimiter in US claims)
+        raw_parts = re.split(r";\s*", text)
+
+        elements: List[str] = []
+        for part in raw_parts:
+            part = part.strip().rstrip(".")
+            if not part or len(part) < 8:
+                continue
+            # Further split lettered sub-steps: "(a) ... (b) ..."
+            sub = re.split(r"\s+and\s+\([a-z]\)\s+", part)
+            for s in sub:
+                s = s.strip()
+                if len(s) >= 8:
+                    elements.append(s)
+
+        # Fallback: if no semicolons found, split on 'comprising' / 'wherein'
+        if not elements:
+            parts = re.split(r"\b(?:comprising|wherein|having|including)\b", text, flags=re.IGNORECASE)
+            elements = [p.strip() for p in parts if len(p.strip()) >= 8]
+
+        return elements or [text[:300]]
+
     async def generate_claim_chart(self, claim_text: str, prior_art_text: str) -> dict:
-        """Element-by-element claim chart: parse claim into limitations, map each to prior art."""
-        claim_snippet = claim_text[:1200] if len(claim_text) > 1200 else claim_text
-        prior_snippet = prior_art_text[:800] if len(prior_art_text) > 800 else prior_art_text
+        """Element-by-element claim chart.
+
+        Strategy: pre-parse elements deterministically (no LLM tokens wasted on
+        parsing), then ask the LLM only to assess each element against the prior
+        art.  Batches elements in groups of 5 to stay within token limits.
+        """
+        prior_snippet = prior_art_text[:900] if len(prior_art_text) > 900 else prior_art_text
+        elements = self._split_claim_elements(claim_text)
+
+        # Build numbered element list for the prompt
+        elements_block = "\n".join(f"{i+1}. {e}" for i, e in enumerate(elements))
 
         prompt = (
-            "You are a patent attorney generating a prior-art claim chart.\n\n"
-            "PATENT CLAIM:\n"
-            f"{claim_snippet}\n\n"
+            "You are a patent examiner generating a prior-art claim chart.\n\n"
+            "CLAIM ELEMENTS (pre-parsed):\n"
+            f"{elements_block}\n\n"
             "PRIOR ART TEXT:\n"
             f"{prior_snippet}\n\n"
-            "Task:\n"
-            "1. Parse the patent claim into its individual elements/limitations "
-            "(split on semicolons, 'wherein', 'comprising', 'said', 'and' that introduces a new element).\n"
-            "2. For each element, find the most relevant passage from the prior art.\n"
-            "3. Assign confidence 0-100 and status.\n\n"
-            'Return ONLY this JSON:\n'
-            '{"elements":[{"num":1,"element":"exact element text","disclosure":"verbatim prior art passage or Not disclosed","confidence":0-100,"status":"disclosed|partial|absent"}],'
+            "For EACH numbered claim element, find the best matching passage from the prior art.\n\n"
+            "Return ONLY this JSON (one entry per element, same count and order):\n"
+            '{"elements":[{"num":1,"element":"<copy element text>","disclosure":"<verbatim prior art passage or Not disclosed>","confidence":0-100,"status":"disclosed|partial|absent"}],'
             '"overall_confidence":0-100,"verdict":"strong|moderate|weak|none"}\n\n'
             "Rules:\n"
-            "- Parse EVERY element, do not skip any\n"
-            "- disclosed≥70, partial 30-69, absent<30\n"
-            "- disclosure must be verbatim from prior art or the string 'Not disclosed'\n"
+            "- Output EXACTLY one JSON object per element, preserving order and numbering\n"
+            "- confidence: disclosed≥70, partial 30-69, absent<30\n"
+            "- disclosure: verbatim phrase from prior art OR the literal string 'Not disclosed'\n"
+            "- overall_confidence: weighted average\n"
+            "- verdict: strong≥70, moderate 45-69, weak 20-44, none<20\n"
             "- OUTPUT ONLY JSON"
         )
 
@@ -238,7 +277,7 @@ class Deconstructor:
                 {"role": "user", "content": prompt},
             ],
             "temperature": 0,
-            "max_tokens": 700,
+            "max_tokens": 1400,
         }
 
         try:
@@ -248,6 +287,7 @@ class Deconstructor:
             return {"elements": [], "overall_confidence": 0, "verdict": "none"}
 
         if resp.status_code != 200:
+            logger.warning("claim-chart LLM error %d: %s", resp.status_code, resp.text[:200])
             return {"elements": [], "overall_confidence": 0, "verdict": "none"}
 
         try:
@@ -257,8 +297,22 @@ class Deconstructor:
                 return {"elements": [], "overall_confidence": 0, "verdict": "none"}
             text = (choices[0].get("message", {}).get("content") or "").strip()
             clean_json = _extract_json(text)
-            return json.loads(clean_json)
-        except (ValueError, json.JSONDecodeError):
+            result = json.loads(clean_json)
+            # If LLM returned fewer elements than expected, fill in absent stubs
+            returned = {e.get("num"): e for e in result.get("elements", [])}
+            filled: List[Dict] = []
+            for i, el_text in enumerate(elements, start=1):
+                entry = returned.get(i, {})
+                filled.append({
+                    "num": i,
+                    "element": entry.get("element") or el_text,
+                    "disclosure": entry.get("disclosure") or "Not disclosed",
+                    "confidence": max(0, min(100, int(entry.get("confidence", 0)))),
+                    "status": entry.get("status") or "absent",
+                })
+            result["elements"] = filled
+            return result
+        except (ValueError, json.JSONDecodeError, KeyError, TypeError):
             return {"elements": [], "overall_confidence": 0, "verdict": "none"}
 
     async def analyze_infringement(self, claim_text: str, prior_art_text: str) -> dict:

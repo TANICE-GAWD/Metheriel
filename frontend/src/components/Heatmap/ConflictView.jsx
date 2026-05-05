@@ -177,14 +177,15 @@ export default function ConflictView({
         <div className="header-left">
           <h2>Conflict Analysis</h2>
           <p className="header-subtitle">
-            {totalConflicts} overlapping phrase{totalConflicts !== 1 ? "s" : ""} detected
+            {totalConflicts} exact phrase overlap{totalConflicts !== 1 ? "s" : ""} detected
           </p>
         </div>
 
         <div className="header-metrics">
-          <div className="metric-card">
+          <div className="metric-card" title="Jaccard phrase-match score — exact wording overlap between claim and prior art">
             <div className="metric-value">{Math.round(confidence * 100)}%</div>
-            <div className="metric-label">Overlap Score</div>
+            <div className="metric-label">Phrase Match</div>
+            <div className="metric-sublabel">exact wording</div>
           </div>
 
           <div className="metric-card">
@@ -193,9 +194,12 @@ export default function ConflictView({
             </div>
           </div>
 
-          <div className="metric-card">
-            <div className="metric-value">{avgSimilarity}</div>
-            <div className="metric-label">Avg Similarity</div>
+          <div className="metric-card" title="Semantic match scored element-by-element by AI — see Claim Chart below">
+            <div className="metric-value">
+              {claimChart ? `${claimChart.overall_confidence}%` : "—"}
+            </div>
+            <div className="metric-label">Semantic Match</div>
+            <div className="metric-sublabel">AI element analysis</div>
           </div>
         </div>
       </div>

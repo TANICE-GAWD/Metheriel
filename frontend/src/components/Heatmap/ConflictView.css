@@ -59,6 +59,14 @@
   letter-spacing: 0.5px;
 }
 
+.metric-sublabel {
+  font-size: 10px;
+  color: var(--color-text-muted);
+  font-style: italic;
+  margin-top: 2px;
+  opacity: 0.75;
+}
+
 .metric-badge {
   padding: var(--spacing-sm) var(--spacing-md);
   border-radius: var(--radius-sm);

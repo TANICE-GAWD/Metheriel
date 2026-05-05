@@ -96,10 +96,19 @@ export default function App() {
                 className="search-input"
                 spellCheck={false}
               />
-              <p className="input-hint">
-                Include the kind code — e.g. <strong>US7123456B2</strong>, not US7123456.
-                Find it at the top of any Google Patents page.
-              </p>
+              <div className="example-chips">
+                <span className="example-label">Try:</span>
+                {["US9419951B1", "US7123456B2"].map(id => (
+                  <button
+                    key={id}
+                    type="button"
+                    className="example-chip"
+                    onClick={() => setQuery(id)}
+                  >
+                    {id}
+                  </button>
+                ))}
+              </div>
             </>
           ) : (
             <textarea
