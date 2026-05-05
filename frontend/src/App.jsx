@@ -3,11 +3,12 @@ import { analyzePatent } from "./services/api";
 import ResultCard from "./components/Results/ResultCard";
 import "./assets/global.css";
 import "./App.css";
+import { Analytics } from "@vercel/analytics/next"
 
 export default function App() {
-  // =========================
-  // 1. STATE
-  // =========================
+  
+  
+  
 
   const [query, setQuery] = useState("");
   const [data, setData] = useState(null);
@@ -16,9 +17,9 @@ export default function App() {
 
   const resultsRef = useRef(null);
 
-  // =========================
-  // 2. SEARCH LOGIC
-  // =========================
+  
+  
+  
 
   const handleSearch = async (e) => {
     e.preventDefault();
@@ -36,7 +37,7 @@ export default function App() {
 
       setData(response);
 
-      // scroll to results after render
+      
       setTimeout(() => {
         resultsRef.current?.scrollIntoView({
           behavior: "smooth",
@@ -49,9 +50,9 @@ export default function App() {
     }
   };
 
-  // =========================
-  // 3. RENDER
-  // =========================
+  
+  
+  
 
   return (
     <div className="app-container">
@@ -144,6 +145,7 @@ export default function App() {
                 />
               ))}
             </div>
+            <Analytics/>
           </div>
         )}
       </section>
