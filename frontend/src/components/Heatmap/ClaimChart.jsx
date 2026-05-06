@@ -1,8 +1,9 @@
 import { useState } from 'react';
 import {
   Table, Badge, Progress, Button, Text, Group, Stack,
-  Paper, Anchor, Tooltip, Collapse,
+  Paper, Anchor, Divider,
 } from '@mantine/core';
+import { useMediaQuery } from '@mantine/hooks';
 import './ClaimChart.css';
 
 const STATUS = {
@@ -41,6 +42,7 @@ function exportCSV(elements, sourceTitle) {
 
 export default function ClaimChart({ data, sourceTitle, sourceUrl }) {
   const [openRow, setOpenRow] = useState(null);
+  const isMobile = useMediaQuery('(max-width: 768px)');
 
   if (!data || !data.elements?.length) return null;
 
@@ -96,25 +98,70 @@ export default function ClaimChart({ data, sourceTitle, sourceUrl }) {
         <Badge color="gray"   variant="outline">{elements.length} Elements</Badge>
       </Group>
 
-      {/* Table */}
-      <Paper withBorder radius="md" style={{ overflow: 'hidden' }}>
-        <Table striped highlightOnHover withColumnBorders={false} verticalSpacing="sm">
-          <Table.Thead style={{ background: '#1a1a2e' }}>
-            <Table.Tr>
-              <Table.Th style={{ color: '#fff', width: 40, textAlign: 'center' }}>#</Table.Th>
-              <Table.Th style={{ color: '#fff', width: '32%' }}>Claim Element</Table.Th>
-              <Table.Th style={{ color: '#fff' }}>Prior Art Disclosure</Table.Th>
-              <Table.Th style={{ color: '#fff', width: 110 }}>Match</Table.Th>
-              <Table.Th style={{ color: '#fff', width: 110 }}>Status</Table.Th>
-            </Table.Tr>
-          </Table.Thead>
-          <Table.Tbody>
-            {elements.map((el, idx) => {
-              const sm      = STATUS[el.status] || STATUS.absent;
-              const isOpen  = openRow === idx;
-              const barColor = el.confidence >= 70 ? 'green' : el.confidence >= 40 ? 'orange' : 'red';
-              return (
-                <>
+      {/* Mobile: card per element */}
+      {isMobile ? (
+        <Stack gap="sm">
+          {elements.map((el, idx) => {
+            const sm = STATUS[el.status] || STATUS.absent;
+            const barColor = el.confidence >= 70 ? 'green' : el.confidence >= 40 ? 'orange' : 'red';
+            const isOpen = openRow === idx;
+            return (
+              <Paper
+                key={idx}
+                withBorder
+                radius="sm"
+                p="sm"
+                style={{ borderLeft: `3px solid var(--mantine-color-${sm.color}-6)`, cursor: 'pointer' }}
+                onClick={() => setOpenRow(isOpen ? null : idx)}
+              >
+                <Group justify="space-between" mb={6} wrap="nowrap">
+                  <Text size="xs" fw={600} c="dimmed">#{el.num}</Text>
+                  <Badge color={sm.color} variant="light" size="sm">{sm.icon} {sm.label}</Badge>
+                </Group>
+
+                <Text size="xs" fs="italic" c="dark" mb={8} lineClamp={isOpen ? undefined : 2}>
+                  {el.element}
+                </Text>
+
+                <Stack gap={4} mb={isOpen ? 8 : 0}>
+                  <Progress value={el.confidence} color={barColor} size="sm" radius="xs" />
+                  <Text size="10px" fw={600} c={barColor}>{el.confidence}% match</Text>
+                </Stack>
+
+                {isOpen && (
+                  <>
+                    <Divider my={8} />
+                    <Text size="xs" fw={600} c="dimmed" mb={4}>Prior Art Disclosure</Text>
+                    {el.disclosure === 'Not disclosed' ? (
+                      <Text size="xs" c="red" fs="italic">Not disclosed</Text>
+                    ) : (
+                      <Text size="xs" c="dimmed" fs="italic">"{el.disclosure}"</Text>
+                    )}
+                  </>
+                )}
+              </Paper>
+            );
+          })}
+        </Stack>
+      ) : (
+        /* Desktop: table */
+        <Paper withBorder radius="md" style={{ overflow: 'hidden' }}>
+          <Table striped highlightOnHover withColumnBorders={false} verticalSpacing="sm">
+            <Table.Thead style={{ background: '#1a1a2e' }}>
+              <Table.Tr>
+                <Table.Th style={{ color: '#fff', width: 40, textAlign: 'center' }}>#</Table.Th>
+                <Table.Th style={{ color: '#fff', width: '32%' }}>Claim Element</Table.Th>
+                <Table.Th style={{ color: '#fff' }}>Prior Art Disclosure</Table.Th>
+                <Table.Th style={{ color: '#fff', width: 110 }}>Match</Table.Th>
+                <Table.Th style={{ color: '#fff', width: 110 }}>Status</Table.Th>
+              </Table.Tr>
+            </Table.Thead>
+            <Table.Tbody>
+              {elements.map((el, idx) => {
+                const sm      = STATUS[el.status] || STATUS.absent;
+                const isOpen  = openRow === idx;
+                const barColor = el.confidence >= 70 ? 'green' : el.confidence >= 40 ? 'orange' : 'red';
+                return (
                   <Table.Tr
                     key={idx}
                     onClick={() => setOpenRow(isOpen ? null : idx)}
@@ -153,12 +200,12 @@ export default function ClaimChart({ data, sourceTitle, sourceUrl }) {
                       </Badge>
                     </Table.Td>
                   </Table.Tr>
-                </>
-              );
-            })}
-          </Table.Tbody>
-        </Table>
-      </Paper>
+                );
+              })}
+            </Table.Tbody>
+          </Table>
+        </Paper>
+      )}
     </Stack>
   );
 }
