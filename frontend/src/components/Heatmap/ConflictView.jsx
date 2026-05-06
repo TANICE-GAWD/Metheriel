@@ -210,7 +210,27 @@ export default function ConflictView({
         </Group>
       </Group>
 
-      <Accordion multiple variant="separated" radius="sm">
+      <Accordion
+        multiple
+        variant="separated"
+        radius="sm"
+        styles={{
+          control: {
+            backgroundColor: 'var(--color-bg-subtle)',
+            padding: '12px 16px',
+            fontWeight: 600,
+            borderBottom: '1px solid var(--color-border)',
+          },
+          chevron: {
+            color: 'var(--color-primary)',
+            width: 18,
+            height: 18,
+          },
+          item: {
+            border: '1.5px solid var(--color-border)',
+          },
+        }}
+      >
 
         {/* IDENTIFIED CONFLICTS */}
         {totalConflicts > 0 && (
@@ -255,7 +275,11 @@ export default function ConflictView({
                           Similarity: {(conflict.similarity * 100).toFixed(0)}%
                         </div>
                       </div>
-                      <div className="expand-icon">{expandedConflict === idx ? "−" : "+"}</div>
+                      <div className={`expand-icon${expandedConflict === idx ? ' open' : ''}`}>
+                        <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+                          <path d="M3 5l4 4 4-4" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
+                        </svg>
+                      </div>
                     </div>
 
                     {expandedConflict === idx && (
