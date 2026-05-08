@@ -5,7 +5,7 @@
 const API_BASE_URL = "https://metheriel-production.up.railway.app";
   
 
-const DEFAULT_TIMEOUT = 25000; 
+const DEFAULT_TIMEOUT = 45000;
 
 
 
@@ -21,10 +21,10 @@ async function fetchWithTimeout(url, options = {}, timeout = DEFAULT_TIMEOUT) {
     });
     return response;
   } catch (err) {
-    if (err.name === "AbortError") {
-      throw new Error("Analysis timed out. Try a shorter claim segment.");
+    if (err.name === "AbortError" || err instanceof DOMException) {
+      throw new Error("Analysis timed out. Please try again on a faster connection.");
     }
-    throw new Error("Network error. Please check your connection.");
+    throw new Error("Could not reach the server. Please check your connection and try again.");
   } finally {
     clearTimeout(id);
   }
@@ -180,7 +180,7 @@ export async function generateClaimChart({ claimText, priorArtText, sourceTitle,
           source_url: sourceUrl || "",
         }),
       },
-      22000
+      40000
     );
     if (!response.ok) return null;
     return await response.json();
@@ -201,7 +201,7 @@ export async function checkInfringement({ claimText, priorArtText }) {
           prior_text: priorArtText,
         }),
       },
-      20000
+      40000
     );
     if (!response.ok) return { matches: [] };
     return await response.json();
