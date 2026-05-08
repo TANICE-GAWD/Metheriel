@@ -15,6 +15,7 @@ from app.search.registry import (
 # Side-effect imports: each module registers its provider on import.
 from app.search import arxiv as _arxiv  # noqa: F401
 from app.search import espacenet as _espacenet  # noqa: F401
+from app.search import openalex as _openalex  # noqa: F401
 
 __all__ = [
     "SearchProvider",
