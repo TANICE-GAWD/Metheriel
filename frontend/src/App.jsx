@@ -9,7 +9,7 @@ import ResultCard from './components/Results/ResultCard';
 import { Analytics } from '@vercel/analytics/react';
 import './App.css';
 
-const EXAMPLE_IDS = ['US9419951B1', 'US7123456B2'];
+const EXAMPLE_IDS = ['US9419951B1', 'US6285999B1'];
 
 export default function App() {
   const [mode, setMode]         = useState('id');

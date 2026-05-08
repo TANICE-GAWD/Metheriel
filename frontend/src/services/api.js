@@ -65,7 +65,7 @@ export async function analyzePatentById({ patentId, targetDate }) {
         message = detail || "Invalid patent ID or format.";
       } else if (response.status === 502) {
         if (detail.includes("404")) {
-          message = `Patent not found on Google Patents. Check the ID and try again (e.g. US7123456B2).`;
+          message = `Patent not found on Google Patents. Check the ID and try again (e.g. US9419951B1).`;
         } else {
           message = detail || "Could not fetch the patent from Google Patents.";
         }
