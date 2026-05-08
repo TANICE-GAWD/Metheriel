@@ -2,8 +2,7 @@
 
 
 
-const API_BASE_URL =
-  import.meta.env.VITE_API_URL || "https://metheriel-production.up.railway.app";
+const API_BASE_URL = "https://metheriel-production.up.railway.app";
   
 
 const DEFAULT_TIMEOUT = 25000; 
